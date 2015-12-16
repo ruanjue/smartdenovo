@@ -1,4 +1,4 @@
-## Get Started
+## Getting Started
 
 ```sh
 # Download sample PacBio from the PBcR website
