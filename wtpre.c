@@ -53,7 +53,7 @@ int main(int argc, char **argv){
 	overwrite = 0;
 	prefix = "pb";
 	outf = NULL;
-	while((c = getopt(argc, argv, "ho:fLJ:p:"))){
+	while((c = getopt(argc, argv, "ho:fLJ:p:")) >= 0){
 		switch(c){
 			case 'h': return usage();
 			case 'o': outf = optarg; break;
