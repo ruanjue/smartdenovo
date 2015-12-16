@@ -1,6 +1,5 @@
-*********
-* wtzmo *
-*********
+wtzmo
+-----
 
 The main overlaper of SMARTdenovo. Seed index -> Seed map -> Alignment.
 
@@ -48,15 +47,15 @@ alignment procedure.
 
 The alignment is splited into four parts.
 
-a) matched zmer. just recover the compression, and add gaps.
+1. matched zmer. just recover the compression, and add gaps.
 
-b) within zmer window. Global alignment between two adject matched zmer.
+2. within zmer window. Global alignment between two adject matched zmer.
 
-c) Between two adject windows. Use banded global SW algorithm, the band size
+3. Between two adject windows. Use banded global SW algorithm, the band size
    iteratively increase from wtzmo -w 50 to wtzmo -W 3200, until the alignment
    score is positive.
 
-d) Extending of two ends. Local alignment. Its band width is specified by wtzmo
+4. Extending of two ends. Local alignment. Its band width is specified by wtzmo
    -e 800.
 
 wtzmo -T -50 means if the best score is bigger than the score at ending by less
@@ -104,17 +103,18 @@ contained read can be used as candiate in other query. That is, we will know
 which reads contain this shorter read, which will be informative in consensus
 calling.
 
-For huge genome, wtzmo can be run in low memory by wtzmo -G <N>. N is the
+For huge genome, wtzmo can be run in low memory by `wtzmo -G <N>`. N is the
 number of parts of kmer-index. Most of memory is spent on kmer-index. Thus,
 split the kmer-index into N parts will reduce the memory into about 1/N. wtzmo
 will record the candidates in additional memory and return to normal flow after
 query all kmer-index parts.
 
-To invoke wtzmo parallelly on multiple nodes, use -P <total_nodes> -p
-<index_of_node>, e.g. -P 60 -p 0 on the first node of 60 nodes. It will take
-the same memory on each node as only on one node.
-
-Example: wtzmo -t 32 -i wt.fa -o wt.zmo.ovl
+To invoke wtzmo parallelly on multiple nodes, use `-P <total_nodes> -p
+<index_of_node>`, e.g. -P 60 -p 0 on the first node of 60 nodes. It will take
+the same memory on each node as only on one node. Example:
+```sh
+wtzmo -t 32 -i wt.fa -o wt.zmo.ovl
+```
 
 Ouput format: tab-delimited
  1, qry_name
@@ -135,9 +135,8 @@ Ouput format: tab-delimited
 16, n_del: deletion
 17, cigar: CIGAR in SAM
 
-*********
-* wtobt *
-*********
+wtobt
+-----
 
 Trim reads base on overlaps. wtobt takes overlaps as input, trims high error
 ending and chimeria. It try to retain max part of one read. First, it find a
@@ -147,14 +146,13 @@ the spurs (as m) and how many reads get partial alignments (as n). If m no less
 than half of the average depth at the spur, reject a chimeria. If m is bigger
 than half of m, reject. otherwise, a chimra is detected. wtobt will retain the
 larger part.
-
+```sh
 wtobt -i wt.fa -j wt.zmo.ovl -o wt.zmo.obt -c 2
-
+```
 wtobt output a read mask file with lines like: read_name offset length.
 
-*********
-* wtgbo *
-*********
+wtgbo
+-----
 
 SMARTdenovo cannot find all of pairwise alignments as nearly all of other
 aligners. It may miss key overlaps on graph. To rescue overlaps that are
@@ -165,15 +163,14 @@ pairs in the same manner as wtzmo's candidates and query.
 
 After generate new valid overlaps, wtgbo build a newer best overlap graph, and
 infer new potential overlaps, until none new valid overlaps or max iterations.
-
+```sh
 wtgbo -t 32 -i wt.fa -j wt.zmo.ovl -o wt.zmo.gbo
-
+```
 wtgbo combine the algorithm of wtzmo and wtlay, its parameters like that of
 wtzmo and wtlay. Its output is the same with wtzmo.
 
-*********
-* wtclp *
-*********
+wtclp
+-----
 
 The goal of wtclp is to maximize the total length of valid overlaps by trimming
 reads or discarding reads (wtclp -F).
@@ -201,9 +198,8 @@ in the similar way as finding peak in NGS kmer-plot.
 wtclp has the same output as wtobt. The reason of having both wtobt and wtclp
 is to save the disk storage. Will discuss it in following section.
 
-*********
-* wtext *
-*********
+wtext
+-----
 
 wtext is used in one kind of SMARTdenovo pipelines. It takes overlaps from
 wtzmo and reads mask file from wtobt as input, and curates the overlaps. After
@@ -217,58 +213,59 @@ become hard in very big dataset. To save the disk usage, I introduced wtclp -F
 mode. It either discards whole read or keeps it as orginal, and needn't to
 invoke wtext to curate alignments.
 
-*********
-* wtlay *
-*********
+wtlay
+-----
 
 Roughly, wtlay implements BOG to generate layout of reads. It may take another
 size of this document to discribe it. Just list some parameters.
 
- - wtlay -w 100. If an overlap is not end-to-end, but leaving N bp unaligned,
+ * `wtlay -w 100`. If an overlap is not end-to-end, but leaving N bp unaligned,
    and the N is no greater than 100, wtlay trust it as true overlap.
 
- - wtlay -c 1. Given a edge/overlap E between two node/reads A and B, the
+ * `wtlay -c 1`. Given a edge/overlap E between two node/reads A and B, the
    coverage of E is computed as how many edges draw out the same path as E. If
    the coverage of E is less than 1, will mask E as unreliable.
 
- - wtlay -r 0.95. which overlap is the best overlap? As high INDEL rate, wtlay
-   doesn't trust the longest one on faith.  wtlay says the best overlap should
-   have alignment score no less than 0.95 * <max score of its same strand>.
+ * `wtlay -r 0.95`. which overlap is the best overlap? As high INDEL rate,
+   wtlay doesn't trust the longest one on faith.  wtlay says the best overlap
+   should have alignment score no less than 0.95 * <max score of its same
+   strand>.
 
- - wtlay -q 0.4. I feel uneasy about it. wtlay doesn't merge bubbles, but cut
+ * `wtlay -q 0.4`. I feel uneasy about it. wtlay doesn't merge bubbles, but cut
    up one path instead, which will leave islands.  To avoid to output them,
    wtlay filtered an unitig haing more than 40% of its length aligned on
    another untig.  It may bring the assembly size down.
 
- - wtlay -Q gCwgBgRURg. Having funs!
+ * `wtlay -Q gCwgBgRURg`. Having funs!
 
-The prefix of output files is specified by wtlay -o <wt.lay>. 
+The prefix of output files is specified by `wtlay -o <wt.lay>`. 
 
 wt.lay.utg is a fasta file, contains uncorrected sequences of unitigs.
 
 wt.lay is a layout file, contains all the information needed by consensus caller.
+```
+>utg1
+Y/N	read_name	strand	offset	length	sequence
+...
+```
+where:
 
- >utg1
- Y/N	read_name	strand	offset	length	sequence
- ...
-
- - Y/N: whether this read is used to build backbone or not. Reads in backbone
+ * Y/N: whether this read is used to build backbone or not. Reads in backbone
    should be not contained by others.
 
- - strand: for human read
+ * strand: for human read
 
- - offset: the offset to previous Y-starting read.
+ * offset: the offset to previous Y-starting read.
 
- - length: for huamn read
+ * length: for huamn read
 
- - sequence: trimmed if need, reversed if need, the direct-in-use sequence used
+ * sequence: trimmed if need, reversed if need, the direct-in-use sequence used
    in calling consensus without any addtional operation.
 
-wt.lay.<N>.dot is the graphviz source file.
+`wt.lay.<N>.dot` is the graphviz source file.
 
-*********
-* wtcns *
-*********
+wtcns
+-----
 
 wtcns implemented the DAGCon algorithm described in HGAP paper. Alignment
 algorithm is integrated into wtcns, thus doesn't need other alignment tool.
@@ -280,20 +277,22 @@ reach to 99.7%, but still cannot fit the need of genome assembly. If you have
 other tools (e.g. Quiver) to improve the consensus sequences, please reduce the
 number of iterations to save time, by wtcns -n 1 or -n 2.
 
-**********
-* wtcorr *
-**********
+wtcorr
+------
 
 Correcting long noisy reads on DBG from short accurate reads using k-mer
 moving. The DBG contains a smaller kmer (e.g. k=25) for k-mer moving, and a
 bigger kmer (e.g. k=41) to verify the path of kmer moving. The bigger kmers are
 stored in counting-bloom-filter to save the memory.
 
-Building the DBG
- wtcorr -t 32 -i read_1.fa -i read_2.fa -k 25 -K 41 -w sr.k25K41.dbg
-
-Correcting
- wtcorr -t 32 -r sr.k25K41.dbg -c 5 -0 3 -1 2 -L -o corrected.fa raw.fa
+Building the DBG:
+```
+wtcorr -t 32 -i read_1.fa -i read_2.fa -k 25 -K 41 -w sr.k25K41.dbg
+```
+and correcting:
+```
+wtcorr -t 32 -r sr.k25K41.dbg -c 5 -0 3 -1 2 -L -o corrected.fa raw.fa
+```
 
 wtcorr is very slow in large genome. It doesn't trust any matched kmer, and try
 to start graph alignment from any possible matched kmer. Given a matched kmer
@@ -315,16 +314,16 @@ However, TGS is expected to solve complicated genomes, which always have flood
 of repeats, will error correction still works well? In SMARTnodeovo, I choose
 to assemble un-corrected long reads.
 
-*********
-* wtcyc *
-*********
+wtcyc
+-----
 
 Align read against its reverse complementary sequence, to detect reads which
 may miss its adpter. wtcyc generate a read mask file to discribe which part of
 reads can be used in further analysis. User needn't process the raw reads file,
 downstream programs can recongize this mask file.
-
- wtcyc -t 32 -i wt.fa -o wt.cyc.clp -a wt.cyc.info
+```sh
+wtcyc -t 32 -i wt.fa -o wt.cyc.clp -a wt.cyc.info
+```
 
 wt.cyc.clp is the resulting mask file. wt.cyc.info is the alignments.
 

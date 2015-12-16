@@ -33,6 +33,6 @@ make -f prefix.mak
 It calls other SMARTdenovo executables in the same directory containing
 `smartdenovo.pl`. After assembly, the raw unitigs are reported in file
 `prefix.lay.utg` and consensus unitigs in `prefix.cns`. If you want to know
-more about how SMARTdenovo works in detail, please see [README-tools.txt][rt].
+more about how SMARTdenovo works in detail, please see [README-tools.md][rt].
 
-[rt]: README-tools.txt
+[rt]: README-tools.md
