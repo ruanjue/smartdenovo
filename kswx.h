@@ -490,7 +490,8 @@ static inline kswx_t kswx_refine_alignment(uint8_t *query, int qb, uint8_t *targ
 	int8_t  *qp, *qpp;
 	register uint8_t d;
 	register int h, m, e, f, t;
-	int i, j, op, len, h1, c;
+	long long i, j;
+	int op, len, h1, c;
 	clear_u32list(cigars2);
 	qe = qb; te = tb;
 	for(i=0;i<(int)cigars->size;i++){
