@@ -2,9 +2,9 @@ VERSION=1.0.0
 MINOR_VER=20140314
 CC=gcc
 ifdef DEBUG
-CFLAGS=-g3 -W -Wall -Werror -O0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
+CFLAGS=-g3 -W -Wall -O0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
 else
-CFLAGS=-W -Wall -Werror -O4 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
+CFLAGS=-W -Wall -O4 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
 endif
 
 GLIBS=-lm -lpthread
