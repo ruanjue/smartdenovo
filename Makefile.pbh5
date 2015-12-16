@@ -1,0 +1,22 @@
+CC=gcc
+HDF5_INC ?=/public/software/include
+HDF5_LIB ?=/public/software/lib
+ifdef DEBUG
+CFLAGS=-g3 -W -Wall -Werror -O0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I$(HDF5_INC) -L$(HDF5_LIB)
+else
+CFLAGS=-W -Wall -Werror -O4 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I$(HDF5_INC) -L$(HDF5_LIB)
+endif
+
+GLIBS=-lm -lhdf5
+GENERIC_SRC=mem_share.h string.h file_reader.h bitvec.h hashset.h sort.h list.h dna.h
+
+all: pbh5tof5q
+
+pbh5tof5q: pbh5tof5q.c $(GENERIC_SRC)
+	$(CC) $(CFLAGS) -o $@ $< $(GLIBS)
+
+clean:
+	rm -f *.o *.gcda *.gcno *.gcov gmon.out pbh5tof5q
+
+clear:
+	rm -f *.o *.gcda *.gcno *.gcov gmon.out
