@@ -15,10 +15,13 @@ ifeq (0, ${MAKELEVEL})
 UNIQ_ID=$(shell date +"%s")
 endif
 #all: pairaln wtcyc wtmer wtzmo wtobt wtclp wtext wtlay wtcns wtdif wtcorr wtjnt
-all: pairaln wtcyc wtmer wtzmo wtobt wtclp wtext wtgbo wtlay wtcns wtmsa
+all: pairaln wtpre wtcyc wtmer wtzmo wtobt wtclp wtext wtgbo wtlay wtcns wtmsa
 
 pairaln: $(GENERIC_SRC) pairaln.c
 	$(CC) $(CFLAGS) -o pairaln file_reader.c ksw.c pairaln.c $(GLIBS)
+
+wtpre: $(GENERIC_SRC) wtpre.c
+	$(CC) $(CFLAGS) -o wtpre file_reader.c wtpre.c $(GLIBS)
 
 wtcyc: $(GENERIC_SRC) wtcyc.c
 	$(CC) $(CFLAGS) -o wtcyc file_reader.c ksw.c wtcyc.c $(GLIBS)
@@ -60,7 +63,7 @@ wtjnt: $(GENERIC_SRC) wtjnt.c hzm_aln.h dagcns.h
 	$(CC) $(CFLAGS) -o wtjnt wtjnt.c file_reader.c ksw.c $(GLIBS)
 
 clean:
-	rm -f *.o *.gcda *.gcno *.gcov gmon.out pairaln wtcyc wtmer wtzmo wtobt wtclp wtext wtlay wtcns wtmsa wtdif wtcorr wtjnt
+	rm -f *.o *.gcda *.gcno *.gcov gmon.out pairaln wtpre wtcyc wtmer wtzmo wtobt wtclp wtext wtlay wtcns wtmsa wtdif wtcorr wtjnt
 
 clear:
 	rm -f *.o *.gcda *.gcno *.gcov gmon.out
