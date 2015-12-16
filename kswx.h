@@ -667,7 +667,8 @@ static inline kswx_t kswx_refine_alignment_5q(uint8_t *query, int qb, uint8_t *t
 	uint8_t *z, *zi;
 	uint8_t d, qmat[4], qins, qdel[4];
 	register uint32_t h1, h, m, e, f;
-	int i, j, op, len;
+	long long i, j;
+	int op, len;
 	SCORE_INF = 0xFFFFFFFFU >> 1;
 	clear_u32list(cigars2);
 	qe = qb; te = tb;
@@ -875,7 +876,8 @@ static inline kswx_t kswx_refine_affine_alignment_5q(uint8_t *query, int qb, uin
 	uint8_t *z, *zi;
 	uint8_t d, qmat[4], qins, qdel[4];
 	register uint32_t h1, h, m, e, f, t;
-	int i, j, op, len;
+	long long i, j;
+	int op, len;
 	SCORE_INF = 0xFFFFFFFFU >> 1;
 	clear_u32list(cigars2);
 	qe = qb; te = tb;
