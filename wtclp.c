@@ -606,7 +606,7 @@ int usage(){
 	" -o          Ouput of reads' regions after clipping, -:stdout, *\n"
 	"             Format: read_name\\toffset\\tlength\n"
 	" -f          Force overwrite output file\n"
-	" -F          Kepp full length or clip all\n"
+	" -F          Keep full length or clip all\n"
 	" -s <int>    Minimum length of alignment, [1000]\n"
 	" -m <float>  Minimum identity of alignment, [0.6]\n"
 	" -C          Trun off specical reservation for reads contained by others\n"
