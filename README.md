@@ -6,7 +6,7 @@ wget -O- http://www.cbcb.umd.edu/software/PBcR/data/selfSampleData.tar.gz | tar 
 awk 'NR%4==1||NR%4==2' selfSampleData/pacbio_filtered.fastq > reads.fa
 # Install SMARTdenovo
 git clone https://github.com/ruanjue/smartdenovo.git && (cd smartdenovo; make)
-# Assemble (unitigs in wtasm.lay.utg)
+# Assemble (raw unitigs in wtasm.lay.utg; consensus unitigs: wtasm.cns)
 smartdenovo/smartdenovo.pl reads.fa > wtasm.mak
 make -f wtasm.mak
 ```
@@ -32,7 +32,7 @@ make -f prefix.mak
 ```
 It calls other SMARTdenovo executables in the same directory containing
 `smartdenovo.pl`. After assembly, the raw unitigs are reported in file
-`prefix.lay.utg`. If you want to know more about how SMARTdenovo works in
-detail, please see [README-tools.txt][rt].
+`prefix.lay.utg` and consensus unitigs in `prefix.cns`. If you want to know
+more about how SMARTdenovo works in detail, please see [README-tools.txt][rt].
 
 [rt]: README-tools.txt

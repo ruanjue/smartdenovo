@@ -248,14 +248,21 @@ wt.lay.utg is a fasta file, contains uncorrected sequences of unitigs.
 
 wt.lay is a layout file, contains all the information needed by consensus caller.
 
->utg1
-Y/N	read_name	strand	offset	length	sequence
-...
-Y/N: whether this read is used to build backbone or not. Reads in backbone should be not contained by others.
-strand: for human read
-offset: the offset to previous Y-starting read.
-length: for huamn read
-sequence: trimmed if need, reversed if need, the direct-in-use sequence used in calling consensus without any addtional operation.
+ >utg1
+ Y/N	read_name	strand	offset	length	sequence
+ ...
+
+ - Y/N: whether this read is used to build backbone or not. Reads in backbone
+   should be not contained by others.
+
+ - strand: for human read
+
+ - offset: the offset to previous Y-starting read.
+
+ - length: for huamn read
+
+ - sequence: trimmed if need, reversed if need, the direct-in-use sequence used
+   in calling consensus without any addtional operation.
 
 wt.lay.<N>.dot is the graphviz source file.
 
