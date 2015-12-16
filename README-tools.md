@@ -117,23 +117,26 @@ wtzmo -t 32 -i wt.fa -o wt.zmo.ovl
 ```
 
 Ouput format: tab-delimited
- 1, qry_name
- 2, qry_strand: +/-
- 3, qry_length
- 4, qry_beg: 0-based
- 5, qry_end: exclusive
- 6, sbj_name
- 7, sbj_strand
- 8, sbj_length
- 9, sbj_beg
-10, sbj_end
-11, score
-12, idenity: 0.0 - 1.0
-13, n_mat: number of matches
-14, n_mis: mismatch
-15, n_ins: insertion
-16, n_del: deletion
-17, cigar: CIGAR in SAM
+
+|Col|Description              |
+|--:|:------------------------|
+|1  |qry_name                 |
+|2  |qry_strand: +/-          |
+|3  |qry_length               |
+|4  |qry_beg: 0-based         |
+|5  |qry_end: exclusive       |
+|6  |sbj_name                 |
+|7  |sbj_strand               |
+|8  |sbj_length               |
+|9  |sbj_beg                  |
+|10 |sbj_end                  |
+|11 |score                    |
+|12 |idenity: 0.0 - 1.0       |
+|13 |n_mat: number of matches |
+|14 |n_mis: mismatch          |
+|15 |n_ins: insertion         |
+|16 |n_del: deletion          |
+|17 |cigar: CIGAR in SAM      |
 
 wtobt
 -----
