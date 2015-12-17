@@ -37,13 +37,13 @@ push(@lines, q/$(PREFIX).ovl.short:$(PREFIX).pre.gz/);
 push(@lines, qq/\t\$(EXE_ZMO) -t \$(N_THREADS) -i \$(PREFIX).pre.gz -fo - -k $opts{k} -s $opts{s} -m $opts{m} 2> \$\@.log | cut -f1-16 > \$\@/, "");
 
 push(@lines, q/$(PREFIX).gbo.short:$(PREFIX).pre.gz $(PREFIX).ovl.short/);
-push(@lines, qq/\t\$(EXE_GBO) -t \$(N_THREADS) -i \$(PREFIX).pre.gz -j \$< -fo - 2> \$\@.log | cut -f1-16 > \$\@/, "");
+push(@lines, qq/\t\$(EXE_GBO) -t \$(N_THREADS) -i \$< -j \$(PREFIX).ovl.short -fo - 2> \$\@.log | cut -f1-16 > \$\@/, "");
 
 push(@lines, q/$(PREFIX).obt:$(PREFIX).ovl.short $(PREFIX).gbo.short/);
 push(@lines, qq/\t\$(EXE_CLP) -i \$< -i \$(PREFIX).gbo.short -fo \$\@ -F -d 4 2> \$\@.log/, "");
 
 push(@lines, q/$(PREFIX).lay.utg $(PREFIX).lay:$(PREFIX).pre.gz $(PREFIX).ovl.short $(PREFIX).gbo.short $(PREFIX).obt/);
-push(@lines, qq/\t\$(EXE_LAY) -i \$(PREFIX).pre.gz -b \$(PREFIX).obt -j \$< -j \$(PREFIX).gbo.short -fo \$(PREFIX).lay -s $opts{s} -m $opts{m} -R -r 1 -c 1 2> \$(PREFIX).lay.log/, "");
+push(@lines, qq/\t\$(EXE_LAY) -i \$< -b \$(PREFIX).obt -j \$(PREFIX).ovl.short -j \$(PREFIX).gbo.short -fo \$(PREFIX).lay -s $opts{s} -m $opts{m} -R -r 1 -c 1 2> \$(PREFIX).lay.log/, "");
 
 push(@lines, q/$(PREFIX).cns:$(PREFIX).lay/);
 push(@lines, qq/\t\$(EXE_CNS) -t \$(N_THREADS) \$< > \$\@ 2> \$\@.log/, "");
