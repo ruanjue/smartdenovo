@@ -105,12 +105,16 @@ int main(int argc, char **argv){
 			if(lst_tag->size == size && strncmp(lst_tag->string, seq->tag.string, size) == 0){
 				if(seq->seq.size > max){
 					clear_string(lst_tag); append_string(lst_tag, seq->tag.string, size);
-					clear_string(lst_dsc); append_string(lst_dsc, seq->header.string, seq->header.size - seq->tag.size);
+					clear_string(lst_dsc); append_string(lst_dsc, seq->header.string + seq->tag.size, seq->header.size - seq->tag.size);
 					clear_string(lst_seq); append_string(lst_seq, seq->seq.string, seq->seq.size);
 					max = seq->seq.size;
 				}
 			} else {
 				if(lst_tag->size) fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, lst_dsc->string, lst_seq->string);
+				clear_string(lst_tag); append_string(lst_tag, seq->tag.string, size);
+				clear_string(lst_dsc); append_string(lst_dsc, seq->header.string + seq->tag.size, seq->header.size - seq->tag.size);
+				clear_string(lst_seq); append_string(lst_seq, seq->seq.string, seq->seq.size);
+				max = seq->seq.size;
 			}
 		} else if(seq->seq.size >= min_len){
 			fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, seq->header.string + seq->tag.size, seq->seq.string);
