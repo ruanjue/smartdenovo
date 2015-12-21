@@ -753,7 +753,7 @@ int usage(){
 	" -l <int>    Maximum variant of uncompressed sizes between two matched zmer, [2]\n"
 	" -M <int>    Alignment penalty: match, [2]\n"
 	" -X <int>    Alignment penalty: mismatch, [-5]\n"
-	" -O <int>    Alignment penalty: insertion or deletion, used in first round [-2]\n"
+	" -O <int>    Alignment penalty: insertion or deletion, used in first round [-3]\n"
 	" -I <int>    Alignment penalty: insertion, used in rounds after first, [-2]\n"
 	" -D <int>    Alignment penalty: deletion, used in rounds after first, [-3]\n"
 	" -E <int>    Alignment penalty: gap extension, [-1]\n"
@@ -810,7 +810,7 @@ int main(int argc, char **argv){
 	W = 3200;
 	M = 2;
 	X = -5;
-	O = -2;
+	O = -3;
 	I = -2;
 	D = -3;
 	E = -1;

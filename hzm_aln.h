@@ -1030,7 +1030,7 @@ static inline HZMAux* init_hzmaux(){
 	aux->rw = 8;
 	aux->M = 2;
 	aux->X = -5;
-	aux->O = -2;
+	aux->O = -3;
 	aux->I = -2;
 	aux->D = -3;
 	aux->E = -1;

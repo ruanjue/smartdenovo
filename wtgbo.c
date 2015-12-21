@@ -350,7 +350,7 @@ int usage(){
 	" -l <int>    Maximum variant of uncompressed sizes between two matched hz-kmer, [2]\n"
 	" -M <int>    Alignment penalty: match, [2]\n"
 	" -X <int>    Alignment penalty: mismatch, [-5]\n"
-	" -O <int>    Alignment penalty: insertion or deletion, [-2]\n"
+	" -O <int>    Alignment penalty: insertion or deletion, [-3]\n"
 	" -E <int>    Alignment penalty: gap extension, [-1]\n"
 	" -T <int>    Alignment penalty: read end clipping, 0: distable HSP extension, otherwise set to -50 or other [-50]\n"
 	" -w <int>    Minimum bandwidth, iteratively doubled to maximum [50]\n"
@@ -398,7 +398,7 @@ int main(int argc, char **argv){
 	W = 3200;
 	M = 2;
 	X = -5;
-	O = -2;
+	O = -3;
 	E = -1;
 	T = -50;
 	hz = 1;

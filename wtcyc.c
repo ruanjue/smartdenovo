@@ -60,7 +60,7 @@ int usage(){
 	" -m <int>    Mininum alignment identity, [0.7]\n"
 	" -M <int>    Alignment penalty: match, [2]\n"
 	" -X <int>    Alignment penalty: mismatch, [-5]\n"
-	" -O <int>    Alignment penalty: gap open, [-2]\n"
+	" -O <int>    Alignment penalty: gap open, [-3]\n"
 	" -E <int>    Alignment penalty: gap extension, [-1]\n"
 	" -T <int>    Alignment penalty: read end clipping, 0: distable HSP extension, otherwise set to -30 or other [-100]\n"
 	" -W <int>    Bandwidth, [800]\n"
@@ -105,7 +105,7 @@ int main(int argc, char **argv){
 	W = 800;
 	M = 2;
 	X = -5;
-	O = -2;
+	O = -3;
 	E = -1;
 	T = -100;
 	ms = 400;
