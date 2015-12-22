@@ -360,7 +360,7 @@ int usage(){
 	" -W <float>  Bandwidth, [800]\n"
 	" -M <int>    Alignment penalty: match, [2]\n"
 	" -X <int>    Alignment penalty: mismatch, [-5]\n"
-	" -O <int>    Alignment penalty: insertion or deletion, [-2]\n"
+	" -O <int>    Alignment penalty: insertion or deletion, [-3]\n"
 	" -E <int>    Alignment penalty: gap extension, [-1]\n"
 	" -T <int>    Alignment penalty: read end clipping [-100]\n"
 	" -S <int>    Maximum extension (bp) in each end, [400]\n"
@@ -394,7 +394,7 @@ int main(int argc, char **argv){
 	ncpu = 1;
 	n_job = 1;
 	i_job = 0;
-	W = 800; M = 2; X = -5; O = -2; E = -1; T = -100;
+	W = 800; M = 2; X = -5; O = -3; E = -1; T = -100;
 	min_score = 200;
 	max_ext = 400;
 	min_id = 0.5;
