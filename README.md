@@ -3,7 +3,7 @@
 ```sh
 # Download sample PacBio from the PBcR website
 wget -O- http://www.cbcb.umd.edu/software/PBcR/data/selfSampleData.tar.gz | tar zxf -
-awk 'NR%4==1||NR%4==2' selfSampleData/pacbio_filtered.fastq > reads.fa
+awk 'NR%4==1||NR%4==2' selfSampleData/pacbio_filtered.fastq | sed 's/^@/>/g' > reads.fa
 # Install SMARTdenovo
 git clone https://github.com/ruanjue/smartdenovo.git && (cd smartdenovo; make)
 # Assemble (raw unitigs in wtasm.lay.utg; consensus unitigs: wtasm.cns)
