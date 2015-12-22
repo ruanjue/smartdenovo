@@ -2650,7 +2650,7 @@ int is_duplicated_layout_strgraph(StringGraph *g, sglayv *lays, float min_cov, u
 	return (cov_len >= (uint32_t)(min_cov * tot_len));
 }
 
-void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *out_utg, FILE *out_lnk, FILE *out_dup, float similar_unitig_cov){
+void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *dup_lay, FILE *out_utg, FILE *out_lnk, FILE *out_dup, float similar_unitig_cov){
 	sglayv *lays, *tmp;
 	sg_layout_t *l;
 	sg_edge_t *e, *p;
@@ -2658,6 +2658,7 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *out_utg
 	String *seq, *ctg;
 	u64hash *hash;
 	u64list *vec;
+	FILE *out_ptr;
 	uint8_t *qvs;
 	uint32_t i, j, k, m, len, ret, is_dup, dup_utg;
 	float dup_cov;
@@ -2674,10 +2675,12 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *out_utg
 		len = length_sglayv(g, lays);
 		if(is_dup){
 			fprintf(out_dup, ">utg%u length=%d nodes=%u dup=utg%u cov=%0.3f\n", i, len, (uint32_t)lays->size, dup_utg, dup_cov);
-			fprintf(out_lay, ">utg%u length=%d nodes=%u dup=utg%u cov=%0.3f\n", i, len, (uint32_t)lays->size, dup_utg, dup_cov);
+			fprintf(dup_lay, ">utg%u length=%d nodes=%u dup=utg%u cov=%0.3f\n", i, len, (uint32_t)lays->size, dup_utg, dup_cov);
+			out_ptr = dup_lay;
 		} else {
 			fprintf(out_utg, ">utg%u length=%d nodes=%u\n", i, len, (uint32_t)lays->size);
 			fprintf(out_lay, ">utg%u length=%d nodes=%u\n", i, len, (uint32_t)lays->size);
+			out_ptr = out_lay;
 			ret ++;
 		}
 		clear_string(ctg); encap_string(ctg, len);
@@ -2705,30 +2708,30 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *out_utg
 			if(l->dir) revseq_basebank(g->rdseqs, g->rdoffs->buffer[l->node_id], g->rdlens->buffer[l->node_id], seq->string);
 			else seq_basebank(g->rdseqs, g->rdoffs->buffer[l->node_id], g->rdlens->buffer[l->node_id], seq->string);
 			seq->size = g->rdlens->buffer[l->node_id];
-			fprintf(out_lay, "%c\t%s\t%c\t%d\t%d\t%s", "YN"[l->contained], (char*)get_cplist(g->rdnames, l->node_id), "+-"[l->dir], l->off, g->rdlens->buffer[l->node_id], seq->string);
+			fprintf(out_ptr, "%c\t%s\t%c\t%d\t%d\t%s", "YN"[l->contained], (char*)get_cplist(g->rdnames, l->node_id), "+-"[l->dir], l->off, g->rdlens->buffer[l->node_id], seq->string);
 			if(g->rdqlens->buffer[l->node_id] == 7 * g->rdlens->buffer[l->node_id]){ // f5q format
-				fputc('\t', out_lay);
+				fputc('\t', out_ptr);
 				qvs = g->rdqvs->buffer + g->rdqoffs->buffer[l->node_id];
 				if(l->dir){
 					for(k=0;k<5;k++){
 						for(m=0;m<g->rdlens->buffer[l->node_id];m++){
-							fputc(qvs[(g->rdlens->buffer[l->node_id] - m - 1) * 7 + k], out_lay);
+							fputc(qvs[(g->rdlens->buffer[l->node_id] - m - 1) * 7 + k], out_ptr);
 						}
 					}
 					for(k=5;k<7;k++){
 						for(m=0;m<g->rdlens->buffer[l->node_id];m++){
-							fputc(reverse_dna_base(qvs[(g->rdlens->buffer[l->node_id] - m - 1) * 7 + k]), out_lay);
+							fputc(reverse_dna_base(qvs[(g->rdlens->buffer[l->node_id] - m - 1) * 7 + k]), out_ptr);
 						}
 					}
 				} else {
 					for(k=0;k<7;k++){
 						for(m=0;m<g->rdlens->buffer[l->node_id];m++){
-							fputc(qvs[m * 7 + k], out_lay);
+							fputc(qvs[m * 7 + k], out_ptr);
 						}
 					}
 				}
 			}
-			fputc('\n', out_lay);
+			fputc('\n', out_ptr);
 			if(l->contained || l->off + seq->size <= (int)len) continue;
 			memcpy(ctg->string + l->off, seq->string, seq->size);
 			len = l->off + seq->size;
@@ -2806,9 +2809,9 @@ int main(int argc, char **argv){
 	FileReader *fr;
 	Sequence *seq;
 	cplist *pbs, *ovls, *obts, *ctns;
-	char *prefix, *dot_file, *lay_file, *utg_file, *lnk_file, *dup_file, *log_file;
+	char *prefix, *dot_file, *lay_file, *day_file, *utg_file, *lnk_file, *dup_file, *log_file;
 	char *commands;
-	FILE *out_dot, *out_lay, *out_utg, *out_lnk, *out_dup, *log;
+	FILE *out_dot, *out_lay, *dup_lay, *out_utg, *out_lnk, *out_dup, *log;
 	unsigned long long n;
 	int c, edgecov_cutoff, force_overwrite, dot_idx, min_score, margin, mat_score;
 	float len_var, score_var, best_score_cutoff, min_id, utg_sm;
@@ -3024,16 +3027,20 @@ int main(int argc, char **argv){
 	if((out_lay = fopen(lay_file, "w")) == NULL){
 		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", lay_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
 	}
+	day_file = catstr(2, prefix, ".dup");
+	if((dup_lay = fopen(day_file, "w")) == NULL){
+		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", day_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
+	}
 	utg_file = catstr(2, prefix, ".utg");
 	if((out_utg = fopen(utg_file, "w")) == NULL){
 		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", utg_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
 	}
+	dup_file = catstr(2, prefix, ".utg.dup");
+	if((out_dup = fopen(dup_file, "w")) == NULL){
+		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", dup_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
+	}
 	lnk_file = catstr(2, prefix, ".lnk");
 	if((out_lnk = fopen(lnk_file, "w")) == NULL){
-		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", lnk_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
-	}
-	dup_file = catstr(2, prefix, ".dup");
-	if((out_dup = fopen(dup_file, "w")) == NULL){
 		fprintf(stderr, " -- Cannot open(write) %s in %s -- %s:%d --\n", lnk_file, __FUNCTION__, __FILE__, __LINE__); fflush(stderr); exit(1);
 	}
 	n = gen_unitigs_layout_strgraph(g);
@@ -3048,12 +3055,14 @@ int main(int argc, char **argv){
 		fclose(out_dot);
 		free(dot_file);
 	}
-	output_unitigs_layout_strgraph(g, out_lay, out_utg, out_lnk, out_dup, utg_sm);
+	output_unitigs_layout_strgraph(g, out_lay, dup_lay, out_utg, out_lnk, out_dup, utg_sm);
 	fclose(out_lay);
+	fclose(dup_lay);
 	fclose(out_utg);
 	fclose(out_lnk);
 	fclose(out_dup);
 	free(lay_file);
+	free(day_file);
 	free(utg_file);
 	free(lnk_file);
 	free(dup_file);
