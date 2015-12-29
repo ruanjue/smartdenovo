@@ -1194,6 +1194,41 @@ int cut_nasty_jump_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int d
 	return 1;
 }
 
+/*
+* n1 and n2 is connected by only n0, but n1 and n2 has their other connective paths, n0 is chimeric
+*/
+int mask_chimeric_node_best_overlap_strgraph(StringGraph *g, uint32_t node_id){
+	sg_node_t *n, *n1, *n2;
+	sg_edge_t *e, *e1, *e2;
+	uint32_t i, k;
+	n = ref_sgnodev(g->nodes, node_id);
+	if(n->bogs[1][0][0] + n->bogs[1][0][1] != 1) return 0; // n0 must has forward edge to n1
+	if(n->bogs[1][1][0] + n->bogs[1][1][1] != 1) return 0; // n0 must has backward edge to n2
+	e1 = first_living_edge_strgraph(g, node_id, 0);
+	e2 = first_living_edge_strgraph(g, node_id, 1);
+	n1 = ref_sgnodev(g->nodes, e1->node_id);
+	k = !e1->dir;
+	for(i=0;i<n1->edge_cnts[k];i++){
+		e = ref_sgedgev(g->edges, n1->edge_offs[k] + i);
+		//if(e->node_id == e2->node_id && e->dir == e2->dir) return 0;
+		if(e->node_id == e2->node_id) return 0; // n1 and n2 is conntective
+	}
+	//whether n1 has its alternative path
+	if(n1->bogs[0][e1->dir][1] + n1->bogs[1][!e1->dir][1] + n1->bogs[1][!e1->dir][0] <= 1) return 0;
+	//whether n2 has its alternative path
+	n2 = ref_sgnodev(g->nodes, e2->node_id);
+	if(n2->bogs[0][e2->dir][1] + n2->bogs[1][!e2->dir][1] + n2->bogs[1][!e2->dir][0] <= 1) return 0;
+	// found chimera, mask it
+	for(k=0;k<2;k++){
+		for(i=0;i<n->edge_cnts[k];i++){
+			e = ref_sgedgev(g->edges, n->edge_offs[k] + i);
+			cut_edge_bog_strgraph(g, e);
+		}
+	}
+	one_bitvec(g->node_status, node_id);
+	return 1;
+}
+
 int repair_lonely_one_way_edge_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n2;
 	sg_edge_t *e1;
@@ -1838,9 +1873,9 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 	uuhash *hash;
 	tracev *bts[2];
 	sg_node_t *n;
-	unsigned long long tip, rep, bub, single, rec, flag;
+	unsigned long long tip, bub, single, rec, chi, flag;
 	uint32_t node_id;
-	tip = rep = bub = single = rec = 0;
+	tip = bub = single = rec = chi = 0;
 	for(node_id=0;node_id<g->nodes->size;node_id++){
 		if(is_dead_node_strgraph(g, node_id)) continue;
 		n = ref_sgnodev(g->nodes, node_id);
@@ -1951,8 +1986,14 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		n = ref_sgnodev(g->nodes, node_id);
 		flag = pack_bogs_flag_strgraph(n);
 		switch(flag){
-			case 0x0100000100010100LLU: rep += repair_jump_core_best_overlap_strgraph(g, node_id, 0); break;
-			case 0x0001010001000001LLU: rep += repair_jump_core_best_overlap_strgraph(g, node_id, 1); break;
+			case 0x0100000100010100LLU: chi += repair_jump_core_best_overlap_strgraph(g, node_id, 0); break;
+			case 0x0001010001000001LLU: chi += repair_jump_core_best_overlap_strgraph(g, node_id, 1); break;
+		}
+	}
+	if(1){
+		for(node_id=0;node_id<g->nodes->size;node_id++){
+			if(is_dead_node_strgraph(g, node_id)) continue;
+			chi += mask_chimeric_node_best_overlap_strgraph(g, node_id);
 		}
 	}
 	for(node_id=0;node_id<g->nodes->size;node_id++){
@@ -1960,8 +2001,8 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		n = ref_sgnodev(g->nodes, node_id);
 		flag = pack_bogs_flag_strgraph(n);
 		switch(flag){
-			case 0x0100000000010100LLU: rep += cut_nasty_jump_best_overlap_strgraph(g, node_id, 0); break;
-			case 0x0000010001000001LLU: rep += cut_nasty_jump_best_overlap_strgraph(g, node_id, 1); break;
+			case 0x0100000000010100LLU: chi += cut_nasty_jump_best_overlap_strgraph(g, node_id, 0); break;
+			case 0x0000010001000001LLU: chi += cut_nasty_jump_best_overlap_strgraph(g, node_id, 1); break;
 		}
 	}
 	bub += cut_loops_bog_strgraph(g);
@@ -1975,8 +2016,8 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		}
 	}
 	rec += recover_paired_dead_ends_bog_strgraph(g);
-	fprintf(stdout, "%llu tips, %llu bubbles, %llu repeats, %llu singletons, %llu recoveries\n", tip, bub, rep, single, rec);
-	return tip + rep + bub + single + rec;
+	fprintf(stdout, "%llu tips, %llu bubbles, %llu chimera, %llu non-bog, %llu recoveries\n", tip, bub, chi, single, rec);
+	return tip + bub + single + rec;
 }
 
 uint32_t cut_read_tips_strgraph(StringGraph *g){
