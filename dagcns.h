@@ -554,6 +554,63 @@ static inline void gen_consensus_dagcns(DAGCNS *g, u32list *map){
 	if(map) while(lst <= g->backbone_size){ push_u32list(map, g->cns->size); lst ++; }
 }
 
+typedef struct {
+	uint32_t node, pos;
+	uint32_t btn, bte;
+} dagmat_t;
+define_list(dagmatv, dagmat_t);
+
+/*
+// Thread-safe
+static inline int match_dagcns(DAGCNS *g, uint8_t *seq, uint32_t len, uint32_t backbone_beg, dagmatv *dps, u4v *stack, u64hash *hash, u4v *cigars){
+	dagnode_t *n;
+	dagedge_t *e;
+	dagmat_t *m, *v;
+	uint64_t *u, U;
+	uint32_t idx, end, pos;
+	int exists;
+	clear_dagmatv(dps);
+	clear_u4v(stack);
+	clear_u64hash(hash);
+	next_ref_dagmatv(dps);
+	m = next_ref_dagmatv(dps);
+	m->node = backbone_beg;
+	m->pos  = 0;
+	m->btn  = 0;
+	m->bte  = 0;
+	put_u64hash(hash, (((uint64_t)m->node) << 32) | m->pos);
+	end = 0;
+	push_u4v(stack, 1);
+	while(stack->size){
+		idx = stack->buffer[--stack->size];
+		m = ref_dagmatv(dps, idx);
+		pos = m->pos + 1;
+		if(pos == len){ end = idx; break; }
+		n = ref_dagnodev(g->nodes, m->node);
+		if(n->edges[0] == 0xFFFFFFFFU) continue;
+		e = ref_dagedgev(g->edges, n->edges[0]);
+		while(1){
+			if(g->nodes->buffer[e->nodes[0]].base == seq[pos]){
+				U = (((uint64_t)e->nodes[0]) << 32) | pos;
+				u = prepare_u64hash(hash, U, &exists);
+				if(!exists){
+					*u = U;
+					v = next_ref_dagmatv(dps);
+					v->node = e->nodes[0];
+					v->pos  = pos;
+					v->btn  = idx;
+					v->bte  = e - g->edges->buffer;
+					push_u4v(stack, dps->size - 1);
+				}
+			}
+			if(e->links[0] == 0xFFFFFFFFU) break;
+			e = ref_dagedgev(g->edges, e->links[0]);
+		}
+	}
+	if(end == 0) return 0;
+	m = ref_dagmatv(dps, end);
+}
+*/
 
 // min_freq: freq = alternative allel count / consensus allel count
 static inline uint32_t call_snv_dagcns(DAGCNS *g, dagsnpv *snps, int min_cnt, float min_freq){

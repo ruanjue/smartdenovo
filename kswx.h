@@ -607,7 +607,7 @@ static inline kswx_t kswx_refine_alignment(uint8_t *query, int qb, uint8_t *targ
 		qpp = qp + query[i + qb] * tl;
 		h1 = f = -10000;
 		zi = z + (((long long)i) * tl);
-		//fprintf(stdout, "ZW\t%d\t%d\t%d\n", i, zb[i], ze[i]);
+		//fprintf(stdout, "ZW\t%d\t%d\t%d\t%d\n", (int)i, zb[i], ze[i], ze[i] - zb[i]);
 		for(j=zb[i];j<ze[i];j++){
 			m = rh[j] + qpp[j];
 			rh[j] = h1;
