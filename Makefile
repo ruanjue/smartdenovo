@@ -6,7 +6,7 @@ CFLAGS=-g3 -W -Wall -O0 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
 else
 CFLAGS=-W -Wall -O4 -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -mpopcnt -mssse3
 endif
-INSTALLDIR=/bins
+INSTALLDIR=/usr/local/bin
 GLIBS=-lm -lpthread
 #GENERIC_SRC=Makefile mem_share.h string.h file_reader.h file_reader.c bitvec.h hashset.h sort.h list.h dna.h thread.h timer.h ksw.h ksw.c kswx.h
 GENERIC_SRC=mem_share.h string.h file_reader.h file_reader.c bitvec.h hashset.h sort.h list.h dna.h thread.h timer.h ksw.h ksw.c kswx.h
