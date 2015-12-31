@@ -17,12 +17,12 @@ wtpre -J 10000 input_raw_pacbio_seqs.fa >wt.fa
 date
 
 # overlap
-wtzmo -t $NCPU -i wt.fa  -fo - -k 16 -s 200 -m $IDENTITY | cut -f 1-16 >wt.zmo.ovl.short
+wtzmo -t $NCPU -i wt.fa  -fo - -9 wt.zmo.aln_pairs -k 16 -s 200 -m $IDENTITY | cut -f 1-16 >wt.zmo.ovl.short
 
 date
 
 # rescue overlaps on graph
-wtgbo -t $NCPU -i wt.fa -j wt.zmo.ovl.short -fo - | cut -f 1-16 >wt.zmo.gbo.short
+wtgbo -t $NCPU -i wt.fa -j wt.zmo.ovl.short -L wt.zmo.aln_pairs -fo - | cut -f 1-16 >wt.zmo.gbo.short
 
 date
 
