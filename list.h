@@ -122,6 +122,26 @@ do {	\
 	}	\
 } while(0)
 
+#define array_heap_replace(ary, len, cap, e_type, _idx, _val, cmp_expr)\
+do {	\
+	e_type pp;	\
+	size_t swap, idx, a, b;	\
+	idx = (size_t)(_idx);	\
+	(ary)[idx] = _val;	\
+	while((size_t)((idx << 1) + 1) < (size_t)(len)){	\
+		swap = idx;	\
+		a = (ary)[swap]; b = (ary)[(idx << 1) + 1];	\
+		if((cmp_expr) > 0) swap = (idx << 1) + 1;	\
+		if(((idx << 1) + 2) < (size_t)(len)){	\
+			a = (ary)[swap]; b = (ary)[(idx << 1) + 2];	\
+			if((cmp_expr) > 0) swap = (idx << 1) + 2;	\
+		}	\
+		if(swap == idx) break;	\
+		pp = (ary)[idx]; (ary)[idx] = (ary)[swap]; (ary)[swap] = pp;	\
+		idx = swap;	\
+	}	\
+} while(0)
+
 #define array_heap_pop(ary, len, cap, e_type, cmp_expr)	\
 ({	\
 	size_t ret;	\
