@@ -31,7 +31,8 @@
 #define DO_NOTHING	0
 
 #define HZMH_KMER_MOD	1024
-#define hzmh_kmer_smear(K) ((K) ^ ((K) >> 4) ^ ((K) >> 7) ^ ((K) >> 12))
+//#define hzmh_kmer_smear(K) ((K) ^ ((K) >> 4) ^ ((K) >> 7) ^ ((K) >> 12))
+#define hzmh_kmer_smear(K) __lh3_Jenkins_hash_int((uint32_t)K)
 
 #define HZM_MAX_SEED_KMER	32
 
@@ -102,6 +103,7 @@ typedef struct {
 	u64hash  *closed_alns;
 	u32list  *rdcovs;
 	int hk, hz;
+	uint32_t hzmh_kmer_mod;
 	uint32_t ksize, zsize, n_idx, kwin, kstep, kovl, ksave, ztot, zovl, max_kmer_freq, max_zmer_freq, max_kmer_var;
 	float    win_rep_norm, win_rep_cutoff;
 	uint32_t avg_rdlen;
@@ -137,12 +139,13 @@ WTZMO* init_wtzmo(uint32_t ksize, uint32_t zsize, int w, int W, int M, int X, in
 	wt->n_rd = 0;
 	wt->n_qr = 0;
 	wt->n_idx = 1;
+	wt->hzmh_kmer_mod = HZMH_KMER_MOD;
 	wt->ksize = ksize;
 	wt->zsize = zsize;
 	wt->kwin  = 500;
 	wt->kstep = 0;
 	wt->kovl  = 200;
-	wt->ksave = 0;
+	wt->ksave = 2;
 	wt->ztot  = 200;
 	wt->zovl  = 100;
 	wt->win_rep_norm   = 10;
@@ -254,8 +257,9 @@ if(midx->task == 1){
 			if(krev == kmer) continue;
 			dir  = krev > kmer? 0 : 1;
 			krev = krev > kmer? kmer : krev;
-			if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-			kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+			//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+			kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+			if(kidx >= HZMH_KMER_MOD) continue;
 			if((kidx % ncpu) != tidx) continue;
 			U.mer = krev;
 			u = prepare_hzmhash(wt->hashs[kidx], U, &exists);
@@ -290,8 +294,9 @@ if(midx->task == 1){
 			if(krev == kmer) continue;
 			dir  = krev > kmer? 0 : 1;
 			krev = krev > kmer? kmer : krev;
-			if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-			kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+			//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+			kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+			if(kidx >= HZMH_KMER_MOD) continue;
 			if((kidx % ncpu) != tidx) continue;
 			U.mer = krev;
 			u = get_hzmhash(wt->hashs[kidx], U);
@@ -379,12 +384,14 @@ void index_wtzmo(WTZMO *wt, uint32_t beg, uint32_t end, uint32_t ncpu){
 		reset_iter_hzmhash(wt->hashs[i]);
 		while((u = ref_iter_hzmhash(wt->hashs[i]))){
 			ktot += u->cnt;
-			if(u->cnt > wt->max_kmer_freq){ u->cnt = wt->max_kmer_freq; nflt ++; }
+			//if(u->cnt > wt->max_kmer_freq){ u->cnt = wt->max_kmer_freq; nflt ++; }
+			if(u->cnt > wt->max_kmer_freq){ u->cnt = 0; u->flt = 1; nflt ++; }
 			{
 				u->off = off;
 				off += u->cnt;
+				if(u->cnt <= 1) u->flt = 1;
+				else nrem ++;
 				u->cnt = 0;
-				nrem ++;
 			}
 		}
 		ktyp += wt->hashs[i]->count;
@@ -417,11 +424,12 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 	hzm_t *p1, P1;
 	hzmin_t *p2, P2;
 	uint64_t kmer, krev, kmask, off, x1, x2;
-	uint32_t i, j, pblen, ol, lst, kidx, id1, id2, cnt, dir;
-	uint8_t b, c;
+	uint32_t i, j, pblen, pblen_up, ol, lst, kidx, id1, id2, cnt, dir;
+	uint8_t b, c, has_next;
 	kmask = 0xFFFFFFFFFFFFFFFFLLU >> ((32 - wt->ksize) << 1);
 	rd = ref_pbreadv(wt->reads, pbid);
 	pblen = rd->rdlen;
+	pblen_up = pblen * 1.2;
 	R.p1 = (hzm_t){0xFFFFFFFFU, 0, 0, 0};
 	P2 = (hzmin_t){0x7FFFFFFFU, 0};
 	R.p2 = &P2;
@@ -445,8 +453,10 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		if(krev == kmer) continue;
 		p1->dir  = krev > kmer? 0 : 1;
 		krev = krev > kmer? kmer : krev;
-		if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-		kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+		//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+		//kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+		kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+		if(kidx >= HZMH_KMER_MOD) continue;
 		h = get_hzmhash(wt->hashs[kidx], (hzmh_t){krev, 0, 0, 0});
 		if(h == NULL) continue;
 		if(wt->debug > 3){
@@ -463,7 +473,7 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		while(r->beg < r->end){
 			r->p2 = ref_hzminv(wt->seeds, r->beg ++);
 			if(r->p2->rd_id == pbid) continue;
-			if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen) continue;
+			if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen_up) continue;
 			array_heap_push(heap->buffer, heap->size, heap->cap, uint32_t, refs->size - 1, heap_cmp_hz_ref_macro(refs, a, b));
 			break;
 		}
@@ -475,12 +485,26 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 	dir = 0;
 	x1 = x2 = 0xFFFFFFFF00000000LLU;
 	while(1){
-		id1 = array_heap_pop(heap->buffer, heap->size, heap->cap, uint32_t, heap_cmp_hz_ref_macro(refs, a, b));
-		if(id1 != 0xFFFFFFFFU){
+		if(heap->size){
+			id1 = heap->buffer[0];
 			r = ref_hzrefv(refs, id1);
-		} else r = &R;
-		p1 = &r->p1;
-		p2 = r->p2;
+			p1 = &r->p1;
+			p2 = r->p2;
+			has_next = 0;
+			while(r->beg < r->end){
+				r->p2 = ref_hzminv(wt->seeds, r->beg ++);
+				if(r->p2->rd_id == pbid) continue;
+				if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen_up) continue;
+				array_heap_replace(heap->buffer, heap->size, heap->cap, uint32_t, 0, id1, heap_cmp_hz_ref_macro(refs, a, b));
+				has_next = 1;
+				break;
+			}
+			if(has_next == 0) array_heap_remove(heap->buffer, heap->size, heap->cap, uint32_t, 0, heap_cmp_hz_ref_macro(refs, a, b));
+		} else {
+			id1 = 0xFFFFFFFFU;
+			p1 = &R.p1;
+			p2 = R.p2;
+		}
 		if(id2 != p2->rd_id || dir != p2->dir){
 			if(id2 != 0xFFFFFFFFU){
 				if(ol >= wt->kovl){
@@ -490,10 +514,12 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 					else {
 						if(candidates->size >= wt->ncand){
 							if((candidates->buffer[0] & 0xFFFFFFFFU) < ol){
-								array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
+								array_heap_replace(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0, x1,
 									((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
-								array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
-									((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+								//array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
+									//((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+								//array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
+									//((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
 							}
 						} else {
 							array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
@@ -520,20 +546,17 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		else ol += p1->off + p1->len - lst;
 		lst = p1->off + p1->len;
 		cnt ++;
-		while(r->beg < r->end){
-			r->p2 = ref_hzminv(wt->seeds, r->beg ++);
-			if(r->p2->rd_id == pbid) continue;
-			//if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen) continue;
-			array_heap_push(heap->buffer, heap->size, heap->cap, uint32_t, id1, heap_cmp_hz_ref_macro(refs, a, b));
-			break;
-		}
 	}
-	if(x1 != 0xFFFFFFFF00000000LLU){
-		if(candidates->size >= wt->ncand) array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
-			((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+	if(candidates->size >= wt->ncand){
+		if((candidates->buffer[0] & 0xFFFFFFFFU) < ol){
+			array_heap_replace(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0, x1,
+				((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+		}
+	} else {
 		array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
 			((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
 	}
+	//if(candidates->size != 7777777) candidates->size = 0; // TODO DEBUG
 }
 
 typedef struct {
@@ -1355,8 +1378,9 @@ int usage(){
 	" -K <int>    Filter high frequency kmers, maybe repetitive, [0]\n"
 	"             0: set K to 5 * <average_kmer_depth>, but no less than 100\n"
 	" -d <int>    Minimum size of total seeding region for kmer windows, [300]\n"
-	" -S          Trun off memory saving of kmer index.\n"
-	"             Default, skips kmers ending with 'G' and 'T', halve the memory\n"
+	" -S <int>    Subsampling kmers, 1/<-S> kmers are indexed, [2]\n"
+	//" -S          Trun off memory saving of kmer index.\n"
+	//"             Default, skips kmers ending with 'G' and 'T', halve the memory\n"
 	" -G <int>    Build kmer index in multiple iterations to save memory, 1: once, [1]\n"
 	"             Given 10M reads having 100G bases, about 100/(4)=25G used in seq storage, about 100*(6)G=600G\n"
 	"             used in kmer-index. If -G = 10, kmer-index is divided into 10 pieces, thus taking 60G. But we need additional\n"
@@ -1435,7 +1459,7 @@ int main(int argc, char **argv){
 	kwin = 800;
 	kstep = 0;
 	kovl = 300;
-	ksave = 1;
+	ksave = 2;
 	n_idx = 1;
 	wnorm = 20;
 	wrep = 100;
@@ -1460,7 +1484,7 @@ int main(int argc, char **argv){
 	ovls = init_cplist(4);
 	obts = init_cplist(4);
 	tbas = init_cplist(4);
-	while((c = getopt(argc, argv, "ht:P:p:Ni:b:J:I:o:9:SfCH:k:G:z:Z:y:d:r:q:l:K:A:B:r:R:L:F:W:w:e:M:X:O:E:T:s:m:nv")) != -1){
+	while((c = getopt(argc, argv, "ht:P:p:Ni:b:J:I:o:9:S:fCH:k:G:z:Z:y:d:r:q:l:K:A:B:r:R:L:F:W:w:e:M:X:O:E:T:s:m:nv")) != -1){
 		switch(c){
 			case 'h': return usage();
 			case 't': ncpu = atoi(optarg); break;
@@ -1473,7 +1497,7 @@ int main(int argc, char **argv){
 			case 'I': push_cplist(tbas, optarg); break;
 			case 'o': output = optarg; break;
 			case '9': pairoutf = optarg; break;
-			case 'S': ksave = 0; break;
+			case 'S': ksave = atoi(optarg); break;
 			case 'f': overwrite = 1; break;
 			case 'C': skip_contained = 0; break;
 			case 'H': hk = atoi(optarg); hz = (hk >> 1) & 0x01; hk = hk & 0x01; break;
@@ -1515,6 +1539,7 @@ int main(int argc, char **argv){
 	if(pbs->size == 0) return usage();
 	if(ksize > HZM_MAX_SEED_KMER || ksize < 5) return usage();
 	if(zsize > HZM_MAX_SEED_ZMER || zsize < 5) return usage();
+	if(ksave < 1) return usage();
 	wt = init_wtzmo(ksize, zsize, w, W, M, X, O, E, T, min_score, min_id);
 	wt->hk = hk;
 	wt->hz = hz;
@@ -1525,6 +1550,7 @@ int main(int argc, char **argv){
 	wt->ztot = ztot;
 	wt->zovl = zovl;
 	wt->ksave = ksave;
+	wt->hzmh_kmer_mod = HZMH_KMER_MOD * ksave;
 	wt->n_idx = n_idx;
 	wt->win_rep_norm   = wnorm;
 	wt->win_rep_cutoff = wrep;
