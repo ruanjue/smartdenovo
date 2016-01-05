@@ -36,3 +36,5 @@ It calls other SMARTdenovo executables in the same directory containing
 more about how SMARTdenovo works in detail, please see [README-tools.md][rt].
 
 [rt]: README-tools.md
+
+## TODO: Large modification will be done on wtzmo
