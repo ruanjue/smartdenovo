@@ -515,4 +515,50 @@ static inline size_t cplist_deep_obj_desc_cnt(void *list, int idx){
 }
 static const obj_desc_t cplist_deep_obj_desc = {.size = sizeof(cplist), .n_child = 1, .mem_type = {3}, .addr = {offsetof(cplist, buffer)}, .desc = {(struct obj_desc_t*)&OBJ_DESC_CHAR_ARRAY}, .cnt = cplist_deep_obj_desc_cnt};
 
+#define define_recycle_list_array(name, list_type)	\
+typedef struct {	\
+	vplist *array;	\
+	vplist *dustbin;	\
+} name;	\
+	\
+static inline name* init_##name(){	\
+	name *g;	\
+	g = (name*)malloc(sizeof(name));	\
+	g->buffer = init_vplist(4);	\
+	g->dustbin = init_vplist(4);	\
+	return g;	\
+}	\
+	\
+static inline void free_##name(name *g){	\
+	list_type *v;	\
+	size_t i;	\
+	for(i=0;i<g->array->size;i++){	\
+		v = (list_type*)get_vplist(g->array, i);	\
+		if(v) free_##list_type(v);	\
+	}	\
+	for(i=0;i<g->dustbin->size;i++){	\
+		v = (list_type*)get_vplist(g->dustbin, i);	\
+		if(v) free_##list_type(v);	\
+	}	\
+	free_vplist(g->array);	\
+	free_vplist(g->dustbin);	\
+	free(g);	\
+}	\
+	\
+static inline list_type* fetch_##name(name *g){	\
+	list_type *v;	\
+	if(g->dustbin->size) v = (list_type*)g->dustbin->buffer[--g->dustbin->size];	\
+	else v = init_##list_type(4);	\
+	return v;	\
+}	\
+	\
+static inline void recyc_##name(name *g, list_type *v){	\
+	push_vplist(g->dustbin, v);	\
+}	\
+	\
+static inline void recyc_all_##name(name *g, vplist *vs){	\
+	append_vplist(g->dustbin, vs);	\
+	vs->size = 0;	\
+}
+
 #endif
