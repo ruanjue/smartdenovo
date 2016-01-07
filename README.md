@@ -37,4 +37,12 @@ more about how SMARTdenovo works in detail, please see [README-tools.md][rt].
 
 [rt]: README-tools.md
 
-## TODO: Large modification will be done on wtzmo
+## New development
+
+Most time of assembly is spent on Smith-Waterm alignment, which might be not necessary
+to long reads assembly. We are developping a novel algorithm, called dot matrix alignment
+, which is smith-waterman free.
+
+wtzmo now supports dot matrix alignment by add option `-U -1 -m 0.1`. We will add dot matrix
+alignment for whole pipeline in next development.
+
