@@ -1236,10 +1236,12 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	uint64_t ret;
 	uint32_t i, j, rd_id, pbbeg, pbend, i_idx, beg, end;
 	int n_cpu;
+	def_clock(secs);
 	thread_preprocess(mzmo);
 	if(wt->debug) n_cpu = 1;
 	else n_cpu = ncpu;
 	thread_beg_init(mzmo, n_cpu);
+	beg_clock(secs);
 	mzmo->wt = wt;
 	mzmo->rd_id = 0xFFFFFFFFU;
 	mzmo->bcov = 0;
@@ -1334,7 +1336,7 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	free_u32list(mzmo->masks);
 	free_u64list(mzmo->closed);
 	thread_end_close(mzmo);
-	fprintf(zmo_debug_out, "\rprogress: %u %llu 100.00%%\n", (int)end - beg, (unsigned long long)ret); fflush(zmo_debug_out);
+	fprintf(zmo_debug_out, "\rprogress: %u %llu 100.00%%, %0.2f CPU seconds\n", (int)end - beg, (unsigned long long)ret, 1.0 * end_clock(secs) / CLOCKS_PER_SEC); fflush(zmo_debug_out);
 	return ret;
 }
 
