@@ -93,4 +93,26 @@ static inline uint32_t pop_heap(Heap *heap){
 	} else return 0xFFFFFFFFU;
 }
 
+static inline uint32_t replace_heap(Heap *heap, size_t idx, uint32_t p){
+	uint32_t ret, pp;
+	size_t swap;
+	ret = heap->ptrs->buffer[idx];
+	heap->ptrs->buffer[idx] = p;
+	while((idx << 1) + 1 < count_u32list(heap->ptrs)){
+		swap = idx;
+		if(heap->cmp(get_u32list(heap->ptrs, swap), get_u32list(heap->ptrs, (idx << 1) + 1), heap->ref) > 0){
+			swap = (idx << 1) + 1;
+		}
+		if((idx << 1) + 2 < count_u32list(heap->ptrs) && heap->cmp(get_u32list(heap->ptrs, swap), get_u32list(heap->ptrs, (idx << 1) + 2), heap->ref) > 0){
+			swap = (idx << 1) + 2;
+		}
+		if(swap == idx) break;
+		pp = get_u32list(heap->ptrs, idx);
+		set_u32list(heap->ptrs,  idx, get_u32list(heap->ptrs, swap));
+		set_u32list(heap->ptrs, swap, pp);
+		idx = swap;
+	}
+	return ret;
+}
+
 #endif
