@@ -308,7 +308,7 @@ int aln_read_wtcns(WTCNS *g, uint32_t rid, String *alns[2], int iter, wtseedv *w
 	if(fast_align){
 		clear_hzmpv(rs);
 		query_single_read_seeds(rd, rdlen, g->zsize, g->hz, g->zvar, g->hash, g->bits, g->seeds, mem_cigar, anchors);
-		process_hzmps(anchors, rdlen);
+		process_hzmps(anchors);
 		filter_by_region_hzmps(rs, anchors, 0, beg, end, 0, rdlen);
 		clear_wtseedv(windows);
 		clear_hzmpv(anchors);
