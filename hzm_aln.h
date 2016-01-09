@@ -894,12 +894,12 @@ static inline void debug_dot_plot_hzmps(hzmpv *rs){
 	}
 }
 
-static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir, wtseedv *regs, uint32_t beg, uint32_t end, u8list *mem, int W, int max_overhang, float band_penalty){
+static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir, wtseedv *regs, uint32_t beg, uint32_t end, u8list *mem, int max_overhang, float band_penalty, float gap_penalty){
 	typedef struct { int weight, bt; } node_t;
 	node_t *nodes;
 	wt_seed_t *r1, *r2;
 	uint32_t i, j;
-	int mw, bt, band;
+	int mw, bt, band, gap, W, score;
 	if(hzm_debug > 2){
 		fprintf(hzm_debug_out, "CHAINING\t%u\n", pb2);
 	}
@@ -917,15 +917,23 @@ static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir,
 		r1->closed = 1;
 		nodes[i].weight += r1->ovl;
 		if(nodes[i].weight > mw){ mw = nodes[i].weight; bt = i; }
+		W = nodes[i].weight / gap_penalty;
+		//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tW=%d\n", r1->beg[0], i, W);
 		for(j=i+1;j<end;j++){
 			r2 = ref_wtseedv(regs, j);
 			if(r2->beg[1] + max_overhang < r1->end[1]) continue;
 			if(r2->beg[0] + max_overhang < r1->end[0]) continue;
-			if(r2->beg[0] - r1->end[0] > W && r2->beg[1] - r1->end[1] > W) break;
+			if(r2->beg[0] - r1->end[0] > W) break;
 			band = num_diff(r2->beg[0] - r1->end[0], r2->beg[1] - r1->end[1]);
-			if(band > W) continue;
-			band = band * band_penalty;
-			if(nodes[j].weight < nodes[i].weight - band){ nodes[j].weight = nodes[i].weight - band; nodes[j].bt = i; }
+			gap  = num_max(r2->beg[0] - r1->end[0], r2->beg[1] - r1->end[1]);
+			if(gap < 0) gap = 0;
+			score = band * band_penalty + gap * gap_penalty;
+			//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tj=%d\t%d\t%d\t%d\t%d\t%f\t%f\n", r1->beg[0], i, j, band, gap, score, nodes[i].weight - score, band_penalty, gap_penalty);
+			if(nodes[j].weight < nodes[i].weight - score){
+				nodes[j].weight = nodes[i].weight - score;
+				nodes[j].bt = i;
+			}
+			if(score < nodes[i].weight && 2 * band * band_penalty <= regs->buffer[j].ovl) break; // j can replace i in further chaining, heuristically
 		}
 	}
 	mw = 0;
@@ -936,7 +944,7 @@ static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir,
 		mw += r1->ovl;
 		bt = nodes[bt].bt;
 	}
-	if(hzm_debug){
+	if(0 && hzm_debug){
 		fprintf(hzm_debug_out, "CHAIN-HZMP\t%u\t%u\t%c\tweight=%d\n", pb1, pb2, "+-"[dir], mw);
 		j = 0;
 		for(i=beg;i<end;i++){
@@ -950,14 +958,14 @@ static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir,
 	return mw;
 }
 
-static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *regs[2], diagv *diags, u4v *block, u4v *grps, u8list *mem, int xvar, int yvar, int min_block_len, int max_block_gap, int max_overhang, float deviation_penalty){
+static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *regs[2], diagv *diags, u4v *block, u4v *grps, u8list *mem, int xvar, int yvar, int min_block_len, int max_overhang, float deviation_penalty, float gap_penalty){
 	wt_seed_t *seed;
 	uint32_t i, d;
 	int weight[2];
 	kswr_t ret;
 	denoising_hzmps(rs, 0, dst, regs, xvar, yvar, min_block_len, diags, block, grps);
-	weight[0] = chaining_overhang_wtseedv(0, 0, 0, regs[0], 0, regs[0]->size, mem, max_block_gap, max_overhang, deviation_penalty);
-	weight[1] = chaining_overhang_wtseedv(0, 0, 1, regs[1], 0, regs[1]->size, mem, max_block_gap, max_overhang, deviation_penalty);
+	weight[0] = chaining_overhang_wtseedv(0, 0, 0, regs[0], 0, regs[0]->size, mem, max_overhang, deviation_penalty, gap_penalty);
+	weight[1] = chaining_overhang_wtseedv(0, 0, 1, regs[1], 0, regs[1]->size, mem, max_overhang, deviation_penalty, gap_penalty);
 	d = (weight[0] < weight[1]);
 	ret.score = weight[d];
 	ret.qb = ret.tb = 0x7FFFFFFF;
@@ -973,7 +981,7 @@ static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *r
 	}
 	ret.score2 = d;
 	ret.te2 = -1;
-	if(0 && hzm_debug){
+	if(hzm_debug){
 		int qb, qe, tb, te, aln;
 		for(d=0;d<2;d++){
 			fprintf(hzm_debug_out, "\nBLOCKS\t%c\t%d\t%d\n", "+-"[d], (int)regs[d]->size, weight[d]);
@@ -991,7 +999,7 @@ static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *r
 			}
 			if(weight[d] == 0) continue;
 			aln = num_max(qe - qb, te - tb);
-			fprintf(hzm_debug_out, "OVL\t%c\t%d\t%d\t%c\t%d\t%d\t%d\t%d\t%0.5f\n", '+', qb, qe, "+-"[d], tb, te, weight[d], aln, 1.0 * weight[d] / aln);
+			fprintf(hzm_debug_out, "OVL\t%c\t%d\t%d\t%c\t%d\t%d\t%d\t%d\t%0.3f\n", '+', qb, qe, "+-"[d], tb, te, weight[d], aln, 1.0 * weight[d] / aln);
 		}
 	}
 	return ret;
