@@ -43,6 +43,7 @@ Most time of assembly is spent on Smith-Waterm alignment, which might be not nec
 to long reads assembly. We are developping a novel algorithm, called dot matrix alignment
 , which is smith-waterman free.
 
-wtzmo now supports dot matrix alignment by add option `-U -1 -m 0.1`. We will add dot matrix
-alignment for whole pipeline in next development.
+wtzmo now supports dot matrix alignment by add option `-U -1 -m 0.1`. `run_dmo.sh` works
+well on Yeast PacBio dataset and Bacteria ERS554120. Current pipeline call wtzmo twice, 
+which is not necessary, We will work on it.
 
