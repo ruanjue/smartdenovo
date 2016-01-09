@@ -117,8 +117,8 @@ typedef struct {
 	uint32_t max_unalign_in_dovetail;
 	float skip_contained;
 	int best_overlap;
-	int dot_matrix, xvar, yvar, min_block_len, max_block_gap, max_overhang;
-	float deviation_penalty;
+	int dot_matrix, xvar, yvar, min_block_len, max_overhang;
+	float deviation_penalty, gap_penalty;
 	int debug;
 } WTZMO;
 
@@ -178,9 +178,9 @@ WTZMO* init_wtzmo(uint32_t ksize, uint32_t zsize, int w, int W, int M, int X, in
 	wt->xvar = 256;
 	wt->yvar = 32;
 	wt->min_block_len = 512;
-	wt->max_block_gap = 1600;
 	wt->max_overhang = 256;
-	wt->deviation_penalty = 0.05;
+	wt->deviation_penalty = 0.1;
+	wt->gap_penalty = 0.01;
 	wt->debug = 0;
 	return wt;
 }
@@ -846,7 +846,9 @@ for(i=0;i<candidates->size;i++){
 	}
 	if(cache->size * wt->zsize < wt->ztot) continue;
 	if(wt->dot_matrix){
-		r = dot_matrix_align_hzmps(cache, dst, wins, diags, block, grps, mem_cache[0], wt->xvar, wt->yvar, wt->min_block_len, wt->max_block_gap, wt->max_overhang, wt->deviation_penalty);
+		val = ovl_uniq_long_id(id2, pbid, 0);
+		push_u64list(mzmo->closed, val);
+		r = dot_matrix_align_hzmps(cache, dst, wins, diags, block, grps, mem_cache[0], wt->xvar, wt->yvar, wt->min_block_len, wt->max_overhang, wt->deviation_penalty, wt->gap_penalty);
 		ol = num_max(r.qe - r.qb, r.te - r.tb);
 		if(r.score >= wt->min_score && r.score >= (int)(wt->min_id * ol)){
 			HIT.pb1  = pbid;
@@ -865,6 +867,10 @@ for(i=0;i<candidates->size;i++){
 			HIT.aln  = ol;
 			HIT.cigar = NULL;
 			push_wtovlv(mzmo->hits, HIT);
+		}
+		if(wt->reads->size == 2 && hzm_debug){
+			// generate dot_plot.fwd.src.txt, dot_plot.fwd.dst.txt, dot_plot.rev.src.txt, dot_plot.rev.dst.txt
+			debug_dot_plot_hzmps(cache);
 		}
 		continue;
 	}
@@ -1448,10 +1454,10 @@ int usage(){
 	" -z <int>    Smaller kmer size (z-mer), 5 <= <-z> <= %d, [10]\n"
 	" -Z <int>    Filter high frequency z-mers, maybe repetitive, [100]\n"
 	" -U <float>  Ultra-fast dot matrix alignment, pattern search in zmer image\n"
-	"             Usage: wtzmo <other_options> -s 200 -m 0.1 -U 256 -U 32 -U 512 -U 1600 -U 256 -U 0.05\n"
-	"                                                        (1)    (2)   (3)    (4)     (5)    (6)\n"
+	"             Usage: wtzmo <other_options> -s 200 -m 0.1 -U 256 -U 64 -U 512 -U 0.1 -U 0.05\n"
+	"                                                        (1)    (2)   (3)    (4)    (5)\n"
 	"             Intra-block (1): max_gap, (2): max_deviation, (3): min_size\n"
-	"             Inter-block (4): max_gap, (5): max_overhang, (6): deviation penalty\n"
+	"             Inter-block (4): deviation penalty, (5): gap size penalty\n"
 	"             use -U -1 instead of type six default parameters\n"
 	" -y <int>    Zmer window, [800]\n"
 	" -R <int>    Minimum size of seeding region within zmer window, [200]\n"
@@ -1503,8 +1509,8 @@ int main(int argc, char **argv){
 	uint32_t pbid;
 	int c, ncpu, min_rdlen, w, W, ew, M, X, O, E, T, hk, hz, ksize, zsize, kwin, kstep, ksave, ztot, zovl, kovl, kcut, zcut, kvar, min_score, ncand, nbest, overwrite, debug, n_job, i_job, n_idx, best_overlap;
 	float min_id, skip_contained, do_align, fast_align, wrep, wnorm, refine;
-	int dot_matrix, xvar, yvar, min_block_len, max_block_gap, max_overhang;
-	float deviation_penalty, optval;
+	int dot_matrix, xvar, yvar, min_block_len, max_overhang;
+	float deviation_penalty, gap_penalty, optval;
 	HZM_FAST_WINDOW_KMER_CHAINING = 1;
 	output = NULL;
 	pairoutf = NULL;
@@ -1549,11 +1555,11 @@ int main(int argc, char **argv){
 	i_job = 0;
 	dot_matrix = 0;
 	xvar = 256;
-	yvar = 32;
+	yvar = 64;
 	min_block_len = 512;
-	max_block_gap = 1600;
 	max_overhang = 256;
-	deviation_penalty = 0.05;
+	deviation_penalty = 0.1;
+	gap_penalty = 0.05;
 	pbs = init_cplist(4);
 	flts = init_cplist(4);
 	ovls = init_cplist(4);
@@ -1581,15 +1587,14 @@ int main(int argc, char **argv){
 			case 'z': zsize = atoi(optarg); break;
 			case 'Z': zcut = atoi(optarg); break;
 			case 'U': optval = atof(optarg);
-				if(optval < 0){ dot_matrix = 6; break; }
+				if(optval < 0){ dot_matrix = 5; break; }
 				switch(dot_matrix){
 					case 0: xvar = optval; break;
 					case 1: yvar = optval; break;
 					case 2: min_block_len = optval; break;
-					case 3: max_block_gap = optval; break;
-					case 4: max_overhang = optval; break;
-					case 5: deviation_penalty = optval; break;
-					default: dot_matrix = 6;
+					case 3: deviation_penalty = optval; break;
+					case 4: gap_penalty = optval; break;
+					default: dot_matrix = 5;
 				}
 				dot_matrix ++;
 				break;
@@ -1651,9 +1656,9 @@ int main(int argc, char **argv){
 	wt->xvar = xvar;
 	wt->yvar = yvar;
 	wt->min_block_len = min_block_len;
-	wt->max_block_gap = max_block_gap;
 	wt->max_overhang = max_overhang;
 	wt->deviation_penalty = deviation_penalty;
+	wt->gap_penalty = gap_penalty;
 	wt->debug = debug;
 	hzm_debug = debug;
 	if((fr = fopen_m_filereader(pbs->size, pbs->buffer)) == NULL){
