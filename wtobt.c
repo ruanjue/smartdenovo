@@ -32,7 +32,6 @@
 
 #define WT_EDGE_BITS	32
 #define WT_MAX_EDGE	((1LLU << (WT_EDGE_BITS)) - 1U)
-#define WTOBT_MAX_MARGIN	200
 #define WTOBT_CHIMERA_WIN	500
 
 //#define TRIM_ERR
@@ -40,6 +39,8 @@
 #ifdef TRIM_ERR
 #define WTOBT_ERR_WIN	200
 #endif
+
+static int WTOBT_MAX_MARGIN = 200;
 
 typedef struct {
 	uint64_t edge_offs[2];
@@ -407,7 +408,7 @@ for(node_id=tidx;node_id<wt->frgs->size;node_id+=ncpu){
 	}
 	clear_wtbrkv(chis);
 	avg_dep = (tot_dep + alen) / (alen + 1);
-	sort_array(brks->buffer, brks->size, wt_brk_t, a.pos > b.pos);
+	sort_array(brks->buffer, brks->size, wt_brk_t, ((a.pos << 1) | a.dir) > ((b.pos << 1) | b.dir));
 	xx = yy = 0; dep = 0; max = 0; mx = my = 0;
 	for(i=0;i<brks->size;i++){
 		b = ref_wtbrkv(brks, i);
@@ -451,6 +452,9 @@ for(node_id=tidx;node_id<wt->frgs->size;node_id+=ncpu){
 	if(b->dep >= avg_dep) continue;
 	if(2 * b->dep > max + 1) continue;
 	if(b->pos <= n->clips[0] || b->pos >= n->clips[1]) continue;
+	if(strcmp("pb000000014672", wt->rdnames->buffer[node_id]) == 0){
+		fprintf(stderr, " -- spur=%d in %s -- %s:%d --\n", b->pos, __FUNCTION__, __FILE__, __LINE__); fflush(stderr);
+	}
 	if(b->pos - n->clips[0] > n->clips[1] - b->pos){
 		n->clips[1] = b->pos;
 	} else {
@@ -597,6 +601,7 @@ int usage(){
 	"             When trun on special trim (by default), if the B read is trimmed, program will accordingly trim A read\n"
 	" -s <int>    Minimum score of alignment, [200]\n"
 	" -m <float>  Minimum identity of alignment , [0.5]\n"
+	" -w <int>    Maximum margin of alignment, [200]\n"
 	" -c <int>    Minimum depth of overlap between anchored reads along reference read, to detect chimeric reads, [1]\n"
 	"\n"
 	"Example:\n"
@@ -629,7 +634,7 @@ int main(int argc, char **argv){
 	force_overwrite = 0;
 	contained_trim = 1;
 	outf = NULL;
-	while((c = getopt(argc, argv, "hft:i:b:j:o:c:s:m:r:C")) != -1){
+	while((c = getopt(argc, argv, "hft:i:b:j:o:c:s:m:w:C")) != -1){
 		switch(c){
 			case 'h': return usage();
 			case 't': ncpu = atoi(optarg); break;
@@ -641,6 +646,7 @@ int main(int argc, char **argv){
 			case 's': min_score = atoi(optarg); break;
 			case 'm': min_sm = atof(optarg); break;
 			case 'c': min_cov = atoi(optarg); break;
+			case 'w': WTOBT_MAX_MARGIN = atoi(optarg); break;
 			case 'C': contained_trim = 0; break;
 			default: return usage();
 		}
