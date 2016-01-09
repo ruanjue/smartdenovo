@@ -38,6 +38,7 @@
 #define num_cmpgt(a, b) ((a) > (b))
 #define num_cmpx(a, b, c, d) (((a) > (b))? 1 : (((a) < (b))? -1 : (((c) > (d))? 1 : (((c) < (d))? -1 : 0))))
 #define num_cmpgtx(a, b, c, d) (((a) > (b))? 1 : (((a) < (b))? 0 : (((c) > (d)))))
+#define num_abs(n) ((n) < 0? -(n) : (n))
 
 static inline size_t roundup_power2(size_t v){
 	if(v == 0) return 0;
