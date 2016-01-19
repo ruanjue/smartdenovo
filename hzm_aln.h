@@ -114,11 +114,11 @@ static inline void index_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint3
 	index_bitvec(bits);
 }
 
-static inline void query_single_read_seeds_by_region(uint8_t *pbseq, uint32_t pblen, uint32_t zsize, int hz, uint32_t max_kmer_var, hzmhv *hash, BitVec *bits, hzmv *seeds, u32list *hzoff, hzmpv *rs, int qb, int qe, int tb, int te){
+static inline void query_single_read_seeds_by_region(uint8_t *pbseq, uint32_t pblen, uint32_t zsize, int hz, uint32_t max_kcnt, uint32_t max_kmer_var, hzmhv *hash, BitVec *bits, hzmv *seeds, u32list *hzoff, u1v *kcnts, hzmpv *rs, int qb, int qe, int tb, int te){
 	hzm_t   *p1, *p2, M;
 	hzmh_t  *h;
 	uint64_t kmer, krev, kmask;
-	uint32_t i, j, k;
+	uint32_t i, j, k, idx;
 	uint8_t b, c, dir;
 	kmask = 0xFFFFFFFFFFFFFFFFLLU >> ((32 - zsize) << 1);
 	b = 4;
@@ -126,6 +126,10 @@ static inline void query_single_read_seeds_by_region(uint8_t *pbseq, uint32_t pb
 	clear_u32list(hzoff);
 	p2 = &M;
 	clear_hzmpv(rs);
+	if(kcnts){
+		clear_and_encap_u1v(kcnts, hash->size);
+		memset(kcnts->buffer, 0, hash->size);
+	}
 	for(i=j=0;j<pblen;j++){
 		c = pbseq[j];
 		if(hz && c == b) continue;
@@ -145,7 +149,12 @@ static inline void query_single_read_seeds_by_region(uint8_t *pbseq, uint32_t pb
 		M.dir   = dir;
 		M.off   = hzoff->buffer[i - zsize];
 		M.len   = (j + 1 - M.off > HZM_MAX_SEED_LEN)? HZM_MAX_SEED_LEN : j + 1 - M.off;
-		h = ref_hzmhv(hash, rank_bitvec(bits, M.mer + 1) - 1);
+		idx = rank_bitvec(bits, M.mer + 1) - 1;
+		h = ref_hzmhv(hash, idx);
+		if(kcnts){
+			if(kcnts->buffer[idx] >= max_kcnt) continue;
+			kcnts->buffer[idx] ++;
+		}
 		for(k=0;k<h->cnt;k++){
 			p1 = ref_hzmv(seeds, h->off + k);
 			if(p1->off < tb) continue;
@@ -158,14 +167,14 @@ static inline void query_single_read_seeds_by_region(uint8_t *pbseq, uint32_t pb
 			}
 		}
 	}
-	sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1) << 32) | a.off2) > ((((int64_t)b.off1) << 32) | b.off2));
+	//sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1) << 32) | a.off2) > ((((int64_t)b.off1) << 32) | b.off2));
 }
 
-static inline void query_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint32_t zsize, int hz, uint32_t max_kmer_var, hzmhv *hash, BitVec *bits, hzmv *seeds, u32list *hzoff, hzmpv *rs){
+static inline void query_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint32_t zsize, int hz, uint32_t max_kcnt, uint32_t max_kmer_var, hzmhv *hash, BitVec *bits, hzmv *seeds, u32list *hzoff, u1v *kcnts, hzmpv *rs){
 	hzm_t   *p1, *p2, M;
 	hzmh_t  *h;
 	uint64_t kmer, krev, kmask;
-	uint32_t i, j, k;
+	uint32_t i, j, k, idx;
 	uint8_t b, c, dir;
 	kmask = 0xFFFFFFFFFFFFFFFFLLU >> ((32 - zsize) << 1);
 	b = 4;
@@ -173,6 +182,10 @@ static inline void query_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint3
 	clear_u32list(hzoff);
 	p2 = &M;
 	clear_hzmpv(rs);
+	if(kcnts){
+		clear_and_encap_u1v(kcnts, hash->size);
+		memset(kcnts->buffer, 0, hash->size);
+	}
 	for(i=j=0;j<pblen;j++){
 		c = pbseq[j];
 		if(hz && c == b) continue;
@@ -190,7 +203,12 @@ static inline void query_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint3
 		M.dir   = dir;
 		M.off   = hzoff->buffer[i - zsize];
 		M.len   = (j + 1 - M.off > HZM_MAX_SEED_LEN)? HZM_MAX_SEED_LEN : j + 1 - M.off;
-		h = ref_hzmhv(hash, rank_bitvec(bits, M.mer + 1) - 1);
+		idx = rank_bitvec(bits, M.mer + 1) - 1;
+		h = ref_hzmhv(hash, idx);
+		if(kcnts){
+			if(kcnts->buffer[idx] >= max_kcnt) continue;
+			kcnts->buffer[idx] ++;
+		}
 		for(k=0;k<h->cnt;k++){
 			p1 = ref_hzmv(seeds, h->off + k);
 			if((p1->len > p2->len? p1->len - p2->len : p2->len - p1->len) > max_kmer_var) continue;
@@ -202,7 +220,7 @@ static inline void query_single_read_seeds(uint8_t *pbseq, uint32_t pblen, uint3
 			}
 		}
 	}
-	sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1) << 32) | a.off2) > ((((int64_t)b.off1) << 32) | b.off2));
+	//sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1) << 32) | a.off2) > ((((int64_t)b.off1) << 32) | b.off2));
 }
 
 static inline void check_kswx_cigar(kswx_t x, u32list *cigar, uint8_t *pb1, uint8_t *pb2){
@@ -696,12 +714,12 @@ typedef struct {
 } diag_t;
 define_list(diagv, diag_t);
 
-static inline void denoising_hzmps(hzmpv *rs, uint32_t pb2, hzmpv *dst[2], wtseedv *regs[2], int xvar, int yvar, int min_linear_len, diagv *diags, u4v *block, u4v *grps){
+static inline void denoising_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *regs[2], int xvar, int yvar, int min_linear_len, diagv *diags, u4v *block, u4v *grps){
 	diag_t *d;
 	wt_seed_t *seed;
 	hzmp_t *p, *p0, P;
 	uint32_t i, j, k, doff, dcnt, gid;
-	int dir, len, mat, lst;
+	int dir, len, lst;
 	int lst_offset, end_offset;
 	sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1 - (int64_t)a.off2) << 32) | a.off1) > ((((int64_t)b.off1 - (int64_t)b.off2) << 32) | b.off1));
 	memset(&P, 0, sizeof(hzmp_t));
@@ -757,42 +775,52 @@ static inline void denoising_hzmps(hzmpv *rs, uint32_t pb2, hzmpv *dst[2], wtsee
 			// scan linear hzmps
 			if(block->size){
 				p0 = block->size? ref_hzmpv(rs, block->buffer[0]) : NULL;
-				len = mat = p0->len1;
+				len = p0->len1;
 			} else {
-				len = mat = 0;
+				len = 0;
 				p0 = NULL;
 			}
 			j = 0;
 			for(i=1;i<=block->size;i++){
 				p = (i == block->size)? &P : ref_hzmpv(rs, block->buffer[i]);
 				if(p->off1 <= p0->off1 + p0->len1){
-					mat += p->off1 + p->len1 - (p0->off1 + p0->len1);
-					len += p->off1 + p->len1 - (p0->off1 + p0->len1);
+					len += ((int)(p->off1 + p->len1)) - ((int)(p0->off1 + p0->len1));
+					//fprintf(stderr, "hzm_t\t%d\t%d\t%d\n", len, p->off1, p->len1);
 				} else if(p->off1 <= p0->off1 + p0->len1 + xvar){
-					mat += p->len1;
-					len += p->off1 + p->len1 - (p0->off1 + p0->len1);
+					len += ((int)(p->off1 + p->len1)) - ((int)(p0->off1 + p0->len1));
+					//fprintf(stderr, "hzm_t\t%d\t%d\t%d\n", len, p->off1, p->len1);
 				} else {
+					//fprintf(stderr, "HZM_T\t%d\t%d\t%d\n", len, p->off1, p->len1);
 					if(len >= min_linear_len){
 						gid = 0;
 						for(k=j;k<i;k++){
 							if(rs->buffer[block->buffer[k]].gid){
 								if(gid == 0){
 									gid = grps->buffer[rs->buffer[block->buffer[k]].gid];
-								} else {
-									grps->buffer[rs->buffer[block->buffer[k]].gid] = gid;
+								} else if(gid > grps->buffer[rs->buffer[block->buffer[k]].gid]){
+									gid = grps->buffer[rs->buffer[block->buffer[k]].gid];
 								}
 							}
 						}
 						if(gid == 0){
 							gid = grps->size;
 							push_u4v(grps, gid);
+						} else {
+							for(k=j;k<i;k++){
+								if(rs->buffer[block->buffer[k]].gid){
+									grps->buffer[rs->buffer[block->buffer[k]].gid] = gid;
+								}
+							}
 						}
-						for(;j<i;j++){ ref_hzmpv(rs, block->buffer[j])->gid = gid; }
+						for(;j<i;j++){
+							//fprintf(stderr, "G[%d\t%d]\t%d\t%d\n", gid, len, ref_hzmpv(rs, block->buffer[j])->off1, ref_hzmpv(rs, block->buffer[j])->len1);
+							ref_hzmpv(rs, block->buffer[j])->gid = gid;
+						}
 					}
 					j = i;
-					p0 = p;
-					len = mat = p0->len1;
+					len = p0->len1;
 				}
+				p0 = p;
 			}
 			// move offset to next
 			for(i=doff;i<doff+dcnt;i++){
@@ -826,7 +854,7 @@ static inline void denoising_hzmps(hzmpv *rs, uint32_t pb2, hzmpv *dst[2], wtsee
 		for(i=1;i<=dst[dir]->size;i++){
 			if(i < dst[dir]->size && dst[dir]->buffer[i].gid == dst[dir]->buffer[j].gid) continue;
 			seed = next_ref_wtseedv(regs[dir]);
-			seed->pb2 = pb2;
+			seed->pb2 = 0;
 			seed->closed = 0;
 			seed->dir = dir;
 			seed->anchors[0] = j;
@@ -846,9 +874,13 @@ static inline void denoising_hzmps(hzmpv *rs, uint32_t pb2, hzmpv *dst[2], wtsee
 				seed->ovl += (p->off1 > lst)? p->len1 : p->off1 + p->len1 - lst;
 				lst = p->off1 + p->len1;
 			}
+			if(seed->end[0] - seed->beg[0] < min_linear_len){
+				//fprintf(stderr, " -- gid = %d %d,%d=%d in %s -- %s:%d --\n", dst[dir]->buffer[j].gid, seed->beg[0], seed->end[0], seed->end[0] - seed->beg[0], __FUNCTION__, __FILE__, __LINE__); fflush(stderr);
+				regs[dir]->size --;
+			}
 			j = i;
 		}
-		sort_array(regs[dir]->buffer, regs[dir]->size, wt_seed_t, a.beg[0] > b.beg[0]);
+		//sort_array(regs[dir]->buffer, regs[dir]->size, wt_seed_t, a.beg[0] > b.beg[0]);
 	}
 }
 
@@ -894,21 +926,154 @@ static inline void debug_dot_plot_hzmps(hzmpv *rs){
 	}
 }
 
-static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir, wtseedv *regs, uint32_t beg, uint32_t end, u8list *mem, int max_overhang, float band_penalty, float gap_penalty){
-	typedef struct { int weight, bt; } node_t;
+static inline void fast_merge_wtseedv(wtseedv *regs, int xvar, int yvar, diagv *diags, u4v *block, u4v *grps){
+	diag_t *d;
+	wt_seed_t *s, *s0, S;
+	uint32_t i, j, k, doff, dcnt, gid;
+	int lst_offset, end_offset;
+	sort_array(regs->buffer, regs->size, wt_seed_t, ((((int64_t)(a.beg[0] - a.beg[1])) << 32) | a.beg[0]) > ((((int64_t)(b.beg[0] - b.beg[1])) << 32) | b.beg[0]));
+	memset(&S, 0, sizeof(wt_seed_t));
+	S.beg[0] = HZMP_MAX_SEED_OFF;
+	clear_diagv(diags);
+	for(i=0;i<regs->size;i++){
+		d = NULL;
+		s = ref_wtseedv(regs, i);
+		if(d && d->offset == s->beg[0] - s->beg[1]){
+			d->cnt ++;
+		} else {
+			d = next_ref_diagv(diags);
+			d->offset = s->beg[0] - s->beg[1];
+			d->off = i;
+			d->cnt = 1;
+		}
+	}
+	doff = 0;
+	end_offset = - 0x7FFFFFFF;
+	clear_u4v(grps);
+	push_u4v(grps, 0);
+	while(doff < regs->size){
+		lst_offset = diags->buffer[doff].offset;
+		dcnt = 0;
+		while(1){
+			if(diags->buffer[dcnt+doff].offset > lst_offset + yvar) break;
+			if(dcnt + doff + 1 >= diags->size) break;
+			dcnt ++;
+		}
+		if(dcnt == 0) break;
+		if(diags->buffer[doff + dcnt].offset == end_offset){
+			doff += dcnt;
+			continue;
+		}
+		end_offset = diags->buffer[doff + dcnt].offset;
+		clear_u4v(block);
+		for(i=0;i<dcnt;i++){
+			d = ref_diagv(diags, i + doff);
+			for(j=0;j<d->cnt;j++){
+				s = ref_wtseedv(regs, d->off + j);
+				push_u4v(block, d->off + j);
+			}
+		}
+		sort_array(block->buffer, block->size, uint32_t, regs->buffer[a].beg[0] > regs->buffer[b].beg[0]);
+		if(block->size){
+			s0 = block->size? ref_wtseedv(regs, block->buffer[0]) : NULL;
+		} else {
+			s0 = NULL;
+		}
+		j = 0;
+		for(i=1;i<=block->size;i++){
+			s = (i == block->size)? &S : ref_wtseedv(regs, block->buffer[i]);
+			if(s->beg[0] <= s0->end[0] + xvar){
+			} else {
+				gid = 0;
+				for(k=j;k<i;k++){
+					if(regs->buffer[block->buffer[k]].pb2){
+						if(gid == 0){
+							gid = grps->buffer[regs->buffer[block->buffer[k]].pb2];
+						} else {
+							grps->buffer[regs->buffer[block->buffer[k]].pb2] = gid;
+						}
+					}
+				}
+				if(gid == 0){
+					gid = grps->size;
+					push_u4v(grps, gid);
+				}
+				for(;j<i;j++){ ref_wtseedv(regs, block->buffer[j])->pb2 = gid; }
+				j = i;
+				s0 = s;
+			}
+		}
+		// move offset to next
+		for(i=doff;i<doff+dcnt;i++){
+			if(diags->buffer[i].offset > lst_offset + yvar / 2) break;
+		}
+		doff = i;
+	}
+	for(i=1;i<grps->size;i++){
+		if(grps->buffer[i] < i) continue;
+		for(j=i+1;j<grps->size;j++){
+			if(grps->buffer[j] != i) continue;
+			for(k=j+1;k<grps->size;k++){
+				if(grps->buffer[k] == j){
+					grps->buffer[k] = i;
+				}
+			}
+		}
+	}
+	for(i=0;i<regs->size;i++){
+		s = ref_wtseedv(regs, i);
+		if(s->pb2 == 0) continue;
+		// re-map gid
+		s->pb2 = grps->buffer[s->pb2];
+	}
+	sort_array(regs->buffer, regs->size, wt_seed_t, num_cmpgtx(a.pb2, b.pb2, a.beg[0], b.beg[0]));
+	for(j=0;j<regs->size;j++) if(regs->buffer[j].pb2) break;
+	s0 = NULL;
+	for(i=j+1;i<=regs->size;i++){
+		if(i < regs->size && regs->buffer[i].pb2 == regs->buffer[j].pb2) continue;
+		s0 = ref_wtseedv(regs, j);
+		for(k=j+1;k<i;k++){
+			s = ref_wtseedv(regs, k);
+			s->closed = 1;
+			if(s->beg[0] < s0->beg[0]) s0->beg[0] = s->beg[0];
+			if(s->end[0] > s0->end[0]) s0->end[0] = s->end[0];
+			if(s->beg[1] < s0->beg[1]) s0->beg[1] = s->beg[1];
+			if(s->end[1] > s0->end[1]) s0->end[1] = s->end[1];
+			s0->ovl += s->ovl;
+		}
+		j = i;
+	}
+	sort_array(regs->buffer, regs->size, wt_seed_t, a.closed > b.closed);
+	for(i=0;i<regs->size;i++) if(regs->buffer[i].closed) break;
+	regs->size = i;
+	//sort_array(regs->buffer, regs->size, wt_seed_t, a.beg[0] > b.beg[0]);
+}
+
+static inline int chaining_overhang_wtseedv(int pblen1, int pblen2, int dir, wtseedv *regs, uint32_t beg, uint32_t end, u8list *mem, int tail_margin, int max_overhang, float band_penalty, float gap_penalty){
+	typedef struct { int weight:30; uint32_t head:1, tail:1; int bt; } node_t;
 	node_t *nodes;
 	wt_seed_t *r1, *r2;
 	uint32_t i, j;
-	int mw, bt, band, gap, W, score;
+	int mw, bt, band, gap, weight, W, score;
 	if(hzm_debug > 2){
-		fprintf(hzm_debug_out, "CHAINING\t%u\n", pb2);
+		fprintf(hzm_debug_out, "CHAINING\tlen%u\n", pblen2);
 	}
+	sort_array(regs->buffer + beg, end - beg, wt_seed_t, a.beg[0] > b.beg[0]);
 	clear_and_encap_u8list(mem, kswx_roundup8x(sizeof(node_t) * (end - beg)));
 	nodes = (node_t*)mem->buffer;
 	nodes = nodes - beg;
 	for(i=beg;i<end;i++){
-		nodes[i].weight =  0; //- band_penalty * 1000;;
 		nodes[i].bt = - 1;
+		nodes[i].weight = 0;
+		nodes[i].head = 0;
+		nodes[i].tail = 0;
+		r1 = ref_wtseedv(regs, i);
+		if(r1->beg[0] <= tail_margin || r1->beg[1] <= tail_margin){
+			nodes[i].head = 1;
+		}
+		if(r1->end[0] + tail_margin > pblen1 || r1->end[1] + tail_margin > pblen2){
+			nodes[i].tail = 1;
+		}
 	}
 	mw = -1000000;
 	bt = -1;
@@ -916,36 +1081,40 @@ static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir,
 		r1 = ref_wtseedv(regs, i);
 		r1->closed = 1;
 		nodes[i].weight += r1->ovl;
-		if(nodes[i].weight > mw){ mw = nodes[i].weight; bt = i; }
+		weight = nodes[i].weight * ((nodes[i].head + 3) * (nodes[i].tail + 3)) / 16;
+		if(weight > mw){ mw = weight; bt = i; }
 		W = nodes[i].weight / gap_penalty;
-		//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tW=%d\n", r1->beg[0], i, W);
+		//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tbt=%d\tweight=%d\tW=%d\n", r1->beg[0], i, nodes[i].bt, nodes[i].weight, W);
 		for(j=i+1;j<end;j++){
 			r2 = ref_wtseedv(regs, j);
-			if(r2->beg[1] + max_overhang < r1->end[1]) continue;
 			if(r2->beg[0] + max_overhang < r1->end[0]) continue;
+			if(r2->beg[1] + max_overhang < r1->end[1]) continue;
 			if(r2->beg[0] - r1->end[0] > W) break;
 			band = num_diff(r2->beg[0] - r1->end[0], r2->beg[1] - r1->end[1]);
 			gap  = num_max(r2->beg[0] - r1->end[0], r2->beg[1] - r1->end[1]);
-			if(gap < 0) gap = 0;
+			if(gap < 0) gap = - gap;
 			score = band * band_penalty + gap * gap_penalty;
-			//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tj=%d\t%d\t%d\t%d\t%d\t%f\t%f\n", r1->beg[0], i, j, band, gap, score, nodes[i].weight - score, band_penalty, gap_penalty);
-			if(nodes[j].weight < nodes[i].weight - score){
-				nodes[j].weight = nodes[i].weight - score;
+			score = nodes[i].weight - score;
+			//fprintf(hzm_debug_out, "beg[0]=%d\ti=%d\tj=%d\t%d\t%d\t%d\t%d\t%d\n", r1->beg[0], i, j, band, gap, score, nodes[i].weight - score, nodes[j].weight);
+			if(nodes[j].weight <= score){
+				nodes[j].weight = score;
 				nodes[j].bt = i;
+				nodes[j].head = nodes[i].head;
 			}
-			if(score < nodes[i].weight && 2 * band * band_penalty <= regs->buffer[j].ovl) break; // j can replace i in further chaining, heuristically
+			//if(score < nodes[i].weight && 2 * band * band_penalty <= regs->buffer[j].ovl) break; // j can replace i in further chaining, heuristically
 		}
 	}
 	mw = 0;
 	while(bt >= 0){
 		r1 = ref_wtseedv(regs, bt);
 		r1->closed = 0;
+		//fprintf(hzm_debug_out, "CHAIN[%d->%d]\t%d\t%d\t%d\t%d\n", bt, nodes[bt].bt, r1->beg[0], r1->end[0], r1->beg[1], r1->end[1]);
 		//mw += r1->end[0] - r1->beg[0];
 		mw += r1->ovl;
 		bt = nodes[bt].bt;
 	}
 	if(0 && hzm_debug){
-		fprintf(hzm_debug_out, "CHAIN-HZMP\t%u\t%u\t%c\tweight=%d\n", pb1, pb2, "+-"[dir], mw);
+		fprintf(hzm_debug_out, "CHAIN-HZMP\tlen%u\tlen%u\t%c\tweight=%d\n", pblen1, pblen2, "+-"[dir], mw);
 		j = 0;
 		for(i=beg;i<end;i++){
 			r1 = ref_wtseedv(regs, i);
@@ -958,14 +1127,16 @@ static inline int chaining_overhang_wtseedv(uint32_t pb1, uint32_t pb2, int dir,
 	return mw;
 }
 
-static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *regs[2], diagv *diags, u4v *block, u4v *grps, u8list *mem, int xvar, int yvar, int min_block_len, int max_overhang, float deviation_penalty, float gap_penalty){
+static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *regs[2], diagv *diags, u4v *block, u4v *grps, u8list *mem, int pblen1, int pblen2, int xvar, int yvar, int min_block_len, int max_overhang, float deviation_penalty, float gap_penalty){
 	wt_seed_t *seed;
 	uint32_t i, d;
 	int weight[2];
 	kswr_t ret;
-	denoising_hzmps(rs, 0, dst, regs, xvar, yvar, min_block_len, diags, block, grps);
-	weight[0] = chaining_overhang_wtseedv(0, 0, 0, regs[0], 0, regs[0]->size, mem, max_overhang, deviation_penalty, gap_penalty);
-	weight[1] = chaining_overhang_wtseedv(0, 0, 1, regs[1], 0, regs[1]->size, mem, max_overhang, deviation_penalty, gap_penalty);
+	denoising_hzmps(rs, dst, regs, xvar, yvar, min_block_len, diags, block, grps);
+	fast_merge_wtseedv(regs[0], xvar, 2 * yvar, diags, block, grps);
+	fast_merge_wtseedv(regs[1], xvar, 2 * yvar, diags, block, grps);
+	weight[0] = chaining_overhang_wtseedv(pblen1, pblen2, 0, regs[0], 0, regs[0]->size, mem, xvar, max_overhang, deviation_penalty, gap_penalty);
+	weight[1] = chaining_overhang_wtseedv(pblen1, pblen2, 1, regs[1], 0, regs[1]->size, mem, xvar, max_overhang, deviation_penalty, gap_penalty);
 	d = (weight[0] < weight[1]);
 	ret.score = weight[d];
 	ret.qb = ret.tb = 0x7FFFFFFF;
@@ -995,7 +1166,7 @@ static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *r
 					if(qe < seed->end[0]) qe = seed->end[0];
 					if(te < seed->end[1]) te = seed->end[1];
 				}
-				fprintf(hzm_debug_out, "WINDOW\t%c\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%c\n", "+-"[d], seed->beg[0], seed->end[0], seed->beg[1], seed->end[1], seed->ovl, seed->end[0] - seed->beg[0], seed->beg[0] - seed->beg[1], "*x--"[seed->closed]);
+				fprintf(hzm_debug_out, "WINDOW[%03d]\t%c\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%c\n", i, "+-"[d], seed->beg[0], seed->end[0], seed->beg[1], seed->end[1], seed->ovl, seed->end[0] - seed->beg[0], seed->beg[0] - seed->beg[1], "*x--"[seed->closed]);
 			}
 			if(weight[d] == 0) continue;
 			aln = num_max(qe - qb, te - tb);
@@ -1007,7 +1178,7 @@ static inline kswr_t dot_matrix_align_hzmps(hzmpv *rs, hzmpv *dst[2], wtseedv *r
 
 // empty function
 static inline void process_hzmps(hzmpv *rs){
-	if(rs->size) return;
+	sort_array(rs->buffer, rs->size, hzmp_t, ((((int64_t)a.off1) << 32) | a.off2) > ((((int64_t)b.off1) << 32) | b.off2));
 }
 
 static inline void filter_by_region_hzmps(hzmpv *dst, hzmpv *src, int dir, uint32_t beg1, uint32_t end1, uint32_t beg2, uint32_t end2){
@@ -1331,6 +1502,7 @@ typedef struct {
 	hzmpv *rs, *anchors;
 	u8list *mem_cache[2];
 	u32list *mem_cigar, *cigar_cache;
+	u1v *kcnts;
 	alnregv *regs;
 } HZMAux;
 
@@ -1379,6 +1551,7 @@ static inline HZMAux* init_hzmaux(){
 	aux->mem_cache[1] = init_u8list(1024);
 	aux->mem_cigar = init_u32list(1024);
 	aux->cigar_cache = init_u32list(1024);
+	aux->kcnts = init_u1v(1024);
 	aux->regs = init_alnregv(1024);
 	return aux;
 }
@@ -1476,6 +1649,7 @@ static inline void free_hzmaux(HZMAux *aux){
 	free_u8list(aux->mem_cache[1]);
 	free_u32list(aux->mem_cigar);
 	free_u32list(aux->cigar_cache);
+	free_u1v(aux->kcnts);
 	free_alnregv(aux->regs);
 	free(aux);
 }
@@ -1512,7 +1686,7 @@ static inline int align_hzmaux(HZMAux *aux, uint32_t rid, uint8_t *rdseq, uint8_
 	if(beg < 0) beg = 0;
 	if(end <= 0) end = aux->tseq->size;
 	clear_hzmpv(aux->rs);
-	query_single_read_seeds_by_region(rdseq, rdlen, aux->zsize, aux->hz, aux->zvar, aux->hash, aux->bits, aux->seeds, aux->mem_cigar, aux->anchors, 0, rdlen, beg, end);
+	query_single_read_seeds_by_region(rdseq, rdlen, aux->zsize, aux->hz, aux->zmax, aux->zvar, aux->hash, aux->bits, aux->seeds, aux->mem_cigar, aux->kcnts, aux->anchors, 0, rdlen, beg, end);
 	process_hzmps(aux->anchors);
 	filter_by_region_hzmps(aux->rs, aux->anchors, 0, beg, end, 0, rdlen);
 	clear_wtseedv(aux->windows);
