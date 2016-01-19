@@ -44,6 +44,5 @@ to long reads assembly. We are developping a novel algorithm, called dot matrix 
 , which is smith-waterman free.
 
 wtzmo now supports dot matrix alignment by add option `-U -1 -m 0.1`. `run_dmo.sh` works
-well on Yeast PacBio dataset and Bacteria ERS554120. Current pipeline call wtzmo twice, 
-which is not necessary, We will work on it.
+well on E.coli, Yeast PacBio dataset, Bacteria ERS554120, and drosopila.
 
