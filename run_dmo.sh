@@ -7,9 +7,9 @@ cat $0
 echo "==========================================="
 
 NCPU=64
-IDENTITY="0.1"
+IDENTITY=0.1
 MARGIN=300
-DOT_MATRIX="-U 256 -U 64 -U 512 -U 0.1 -U 0.05"
+DOT_MATRIX="-U 128 -U 64 -U 160 -U 1.0 -U 0.05"
 
 date
 
@@ -19,17 +19,12 @@ wtpre -J 10000 input_raw_pacbio_seqs.fa >wt.fa
 date
 
 # overlap
-wtzmo -t $NCPU -i wt.fa  -fo wt.dmo -k 16 $DOT_MATRIX -m $IDENTITY -A 500
+wtzmo -t $NCPU -i wt.fa  -fo wt.dmo.ovl -k 16 -z 10 -Z 16 $DOT_MATRIX -m $IDENTITY -A 1000
 
 date
 
 # clip read
-wtobt -i wt.fa -j wt.dmo -fo wt.dmo.obt -c 2 -m $IDENTITY -w $MARGIN
-
-date
-
-# overlap again
-wtzmo -t $NCPU -i wt.fa -b wt.dmo.obt  -fo wt.dmo.ovl -k 16 $DOT_MATRIX -m $IDENTITY -A 500
+wtclp -i wt.dmo.ovl -fo wt.dmo.obt -d 3 -FT -m $IDENTITY -k $MARGIN
 
 date
 
