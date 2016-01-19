@@ -97,18 +97,19 @@ int main(int argc, char **argv){
 					size --;
 				} else if(seq->tag.string[size-1] == '_'){
 					if(f){
-						size = seq->tag.size; break;
+						break;
 					} else {
 						f = 1;
 					}
 				} else if(seq->tag.string[size-1] == '/'){
 					if(f == 1){
-						size --; break;
+						size --; f = 2; break;
 					} else {
-						size = seq->tag.size; break;
+						break;
 					}
-				}
+				} else break;
 			}
+			if(size <= 0 || f < 2) size = seq->tag.size;
 			if(lst_tag->size == size && strncmp(lst_tag->string, seq->tag.string, size) == 0){
 				if(seqlen > max){
 					clear_string(lst_tag); append_string(lst_tag, seq->tag.string, size);
