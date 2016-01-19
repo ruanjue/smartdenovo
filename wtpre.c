@@ -31,6 +31,7 @@ int usage(){
 	" -f          Force overwrite output file\n"
 	" -L          Keep all subreads in a well, default: the longest one\n"
 	" -J <int>    Jack knife of read length, [0]\n"
+	" -c <int>    Clip <-c> bases at both ends, [0]\n"
 	" -p <string> Change the read name into {\"%%s%%012d\", <-p>}, [pb]\n"
 	"\n"
 	"Example: \n"
@@ -44,22 +45,25 @@ int main(int argc, char **argv){
 	FileReader *fr;
 	Sequence *seq;
 	String *lst_tag, *lst_dsc, *lst_seq;
-	int longest, min_len, c, overwrite, max;
+	char *seqstr;
+	int longest, min_len, clp_len, seqlen, c, overwrite, max;
 	unsigned long long idx;
 	char *prefix, *outf;
 	FILE *out;
 	longest = 1;
 	min_len = 0;
+	clp_len = 0;
 	overwrite = 0;
 	prefix = "pb";
 	outf = NULL;
-	while((c = getopt(argc, argv, "ho:fLJ:p:")) >= 0){
+	while((c = getopt(argc, argv, "ho:fLJ:c:p:")) >= 0){
 		switch(c){
 			case 'h': return usage();
 			case 'o': outf = optarg; break;
 			case 'f': overwrite = 1; break;
 			case 'L': longest = 0; break;
 			case 'J': min_len = atoi(optarg); break;
+			case 'c': clp_len = atoi(optarg); break;
 			case 'p': prefix = optarg; break;
 			default: return usage();
 		}
@@ -80,7 +84,10 @@ int main(int argc, char **argv){
 	int print;
 	print = 0;
 	while(fread_seq(&seq, fr)){
-		if(seq->seq.size < min_len) continue;
+		seqstr = seq->seq.string + clp_len;
+		seqlen = seq->seq.size - 2 * clp_len;
+		if(seqlen < min_len) continue;
+		seqstr[seqlen] = '\0';
 		if(longest){
 			int size, f;
 			size = seq->tag.size;
@@ -103,21 +110,21 @@ int main(int argc, char **argv){
 				}
 			}
 			if(lst_tag->size == size && strncmp(lst_tag->string, seq->tag.string, size) == 0){
-				if(seq->seq.size > max){
+				if(seqlen > max){
 					clear_string(lst_tag); append_string(lst_tag, seq->tag.string, size);
 					clear_string(lst_dsc); append_string(lst_dsc, seq->header.string + seq->tag.size, seq->header.size - seq->tag.size);
-					clear_string(lst_seq); append_string(lst_seq, seq->seq.string, seq->seq.size);
+					clear_string(lst_seq); append_string(lst_seq, seqstr, seqlen);
 					max = seq->seq.size;
 				}
 			} else {
 				if(lst_tag->size) fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, lst_dsc->string, lst_seq->string);
 				clear_string(lst_tag); append_string(lst_tag, seq->tag.string, size);
 				clear_string(lst_dsc); append_string(lst_dsc, seq->header.string + seq->tag.size, seq->header.size - seq->tag.size);
-				clear_string(lst_seq); append_string(lst_seq, seq->seq.string, seq->seq.size);
+				clear_string(lst_seq); append_string(lst_seq, seqstr, seqlen);
 				max = seq->seq.size;
 			}
-		} else if(seq->seq.size >= min_len){
-			fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, seq->header.string + seq->tag.size, seq->seq.string);
+		} else if(seqlen >= min_len){
+			fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, seq->header.string + seq->tag.size, seqstr);
 		}
 	}
 	if(lst_tag->size) fprintf(out, ">%s%012llu%s\n%s\n", prefix, idx ++, lst_dsc->string, lst_seq->string);
