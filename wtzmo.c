@@ -742,6 +742,7 @@ u4v *block, *grps;
 u8list *rdseq, *hzseq, *pb1, *pb2;
 u8list *mem_pbseq, *mem_cache[2];
 u32list *mem_cigar, *cigar_cache, *cigars;
+u1v * kcnts;
 SimpMSA *msa;
 u8list *mseq;
 kswr_t r;
@@ -779,6 +780,7 @@ mem_cigar = init_u32list(64);
 cigar_cache = init_u32list(64);
 memset(&SEED[0], 0, sizeof(wt_seed_t));
 memset(&SEED[1], 0, sizeof(wt_seed_t));
+kcnts = init_u1v(1024);
 regs = init_alnregv(64);
 msa = init_simpMSA(wt, 0.20, 4);
 //for dot matrix alignment
@@ -832,7 +834,7 @@ encap_f4v(weights, wt->reads->buffer[pbid].rdlen);
 zbits  = init_bitvec(0xFFFFFFFFFFFFFFFFLLU >> ((32 - wt->zsize) << 1));
 clear_and_encap_u8list(pb1, alen);
 bitseq_basebank(wt->rdseqs, wt->reads->buffer[pbid].rdoff, alen, pb1->buffer);
-index_single_read_seeds(pb1->buffer, alen, wt->zsize, wt->hz, 64, zhash, zbits, zseeds, hzoff);
+index_single_read_seeds(pb1->buffer, alen, wt->zsize, wt->hz, wt->max_zmer_freq, zhash, zbits, zseeds, hzoff);
 for(i=0;i<candidates->size;i++){
 	id2 = get_u64list(candidates, i) >> 32;
 	//if(exists_u64hash(wt->closed_alns, ovl_uniq_long_id(pbid, id2, 0))) continue;
@@ -840,7 +842,7 @@ for(i=0;i<candidates->size;i++){
 	blen = wt->reads->buffer[id2].rdlen;
 	clear_and_encap_u8list(pb2, blen);
 	bitseq_basebank(wt->rdseqs, wt->reads->buffer[id2].rdoff, blen, pb2->buffer);
-	query_single_read_seeds(pb2->buffer, blen, wt->zsize, wt->hz, wt->max_kmer_var, zhash, zbits, zseeds, hzoff, cache);
+	query_single_read_seeds(pb2->buffer, blen, wt->zsize, wt->hz, wt->max_zmer_freq, wt->max_kmer_var, zhash, zbits, zseeds, hzoff, kcnts, cache);
 	if(wt->debug > 2){
 		fprintf(zmo_debug_out, "Query\t%s\t%d\n", wt->reads->buffer[id2].rdname, (int)cache->size);
 	}
@@ -848,7 +850,7 @@ for(i=0;i<candidates->size;i++){
 	if(wt->dot_matrix){
 		val = ovl_uniq_long_id(id2, pbid, 0);
 		push_u64list(mzmo->closed, val);
-		r = dot_matrix_align_hzmps(cache, dst, wins, diags, block, grps, mem_cache[0], wt->xvar, wt->yvar, wt->min_block_len, wt->max_overhang, wt->deviation_penalty, wt->gap_penalty);
+		r = dot_matrix_align_hzmps(cache, dst, wins, diags, block, grps, mem_cache[0], alen, blen, wt->xvar, wt->yvar, wt->min_block_len, wt->max_overhang, wt->deviation_penalty, wt->gap_penalty);
 		ol = num_max(r.qe - r.qb, r.te - r.tb);
 		if(r.score >= wt->min_score && r.score >= (int)(wt->min_id * ol)){
 			HIT.pb1  = pbid;
@@ -1452,13 +1454,14 @@ int usage(){
 	"             used in kmer-index. If -G = 10, kmer-index is divided into 10 pieces, thus taking 60G. But we need additional\n"
 	"             10M / <tot_jobs: -P> * 8 * <num_of_cand: -A> memory to store candidates to be aligned.\n"
 	" -z <int>    Smaller kmer size (z-mer), 5 <= <-z> <= %d, [10]\n"
-	" -Z <int>    Filter high frequency z-mers, maybe repetitive, [100]\n"
+	" -Z <int>    Filter high frequency z-mers, maybe repetitive, [64]\n"
 	" -U <float>  Ultra-fast dot matrix alignment, pattern search in zmer image\n"
-	"             Usage: wtzmo <other_options> -s 200 -m 0.1 -U 256 -U 64 -U 512 -U 0.1 -U 0.05\n"
+	"             Usage: wtzmo <other_options> -s 200 -m 0.1 -U 128 -U 64 -U 160 -U 1.0 -U 0.05\n"
 	"                                                        (1)    (2)   (3)    (4)    (5)\n"
 	"             Intra-block (1): max_gap, (2): max_deviation, (3): min_size\n"
 	"             Inter-block (4): deviation penalty, (5): gap size penalty\n"
 	"             use -U -1 instead of type six default parameters\n"
+	"             Will trun off -y -R -r -l -q -B -C -M -X -O -W -T -w -W -e -n"
 	" -y <int>    Zmer window, [800]\n"
 	" -R <int>    Minimum size of seeding region within zmer window, [200]\n"
 	" -r <int>    Minimum size of total seeding region for zmer windows, [300]\n"
@@ -1542,7 +1545,7 @@ int main(int argc, char **argv){
 	ztot = 300;
 	zovl = 200;
 	kcut = 0;
-	zcut = 100;
+	zcut = 64;
 	kvar = 2;
 	skip_contained = 1;
 	overwrite = 0;
@@ -1554,11 +1557,11 @@ int main(int argc, char **argv){
 	n_job = 1;
 	i_job = 0;
 	dot_matrix = 0;
-	xvar = 256;
+	xvar = 128;
 	yvar = 64;
-	min_block_len = 512;
+	min_block_len = 160;
 	max_overhang = 256;
-	deviation_penalty = 0.1;
+	deviation_penalty = 1.0;
 	gap_penalty = 0.05;
 	pbs = init_cplist(4);
 	flts = init_cplist(4);
@@ -1633,6 +1636,7 @@ int main(int argc, char **argv){
 	if(ksize > HZM_MAX_SEED_KMER || ksize < 5) return usage();
 	if(zsize > HZM_MAX_SEED_ZMER || zsize < 5) return usage();
 	if(ksave < 1) return usage();
+	max_overhang = 2 * xvar;
 	wt = init_wtzmo(ksize, zsize, w, W, M, X, O, E, T, min_score, min_id);
 	wt->hk = hk;
 	wt->hz = hz;
