@@ -45,7 +45,7 @@ push(@lines, qq/\t\$(EXE_PRE) -J $opts{J} $ARGV[0] | gzip -c -1 > \$\@/, "");
 
 if($opts{e} eq 'dmo'){
 	push(@lines, q/$(PREFIX).dmo.ovl:$(PREFIX).fa.gz/);
-	push(@lines, qq/\t\$(EXE_ZMO) -t \$(N_THREADS) -i \$(PREFIX).fa.gz -fo \$\@ -k $opts{k} -z 10 -Z 16 -U -1 -m 0.1/, "");
+	push(@lines, qq/\t\$(EXE_ZMO) -t \$(N_THREADS) -i \$(PREFIX).fa.gz -fo \$\@ -k $opts{k} -z 10 -Z 16 -U -1 -m 0.1 -A 1000/, "");
 
 	push(@lines, q/$(PREFIX).dmo.obt:$(PREFIX).fa.gz $(PREFIX).dmo.ovl/);
 	push(@lines, qq/\t\$(EXE_CLP) -i \$(PREFIX).dmo.ovl -fo \$\@ -d 3 -k 300 -m 0.1 -FT/, "");
