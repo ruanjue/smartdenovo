@@ -22,6 +22,7 @@
 
 static uint32_t MERGE_BUBBLE_MAX_STEP = 20;
 static uint32_t CUT_LOOP_MAX_STEP     = 5;
+static uint32_t MIN_LAY_NODES = 4;
 
 define_list(f32list, float);
 
@@ -2500,6 +2501,7 @@ uint32_t gen_unitigs_layout_strgraph(StringGraph *g){
 	for(node_id=0;node_id<g->nodes->size;node_id++){
 		if(is_dead_node_strgraph(g, node_id)) continue;
 		if(get_bitvec(g->node_flags, node_id)) continue;
+		if(g->rdlens->buffer[node_id] == 0) continue;
 		lays = init_sglayv(32);
 		l = next_ref_sglayv(lays);
 		l->node_id = node_id;
@@ -2511,12 +2513,13 @@ uint32_t gen_unitigs_layout_strgraph(StringGraph *g){
 		while(bog_step_once_strgraph(g, lays)){ one_bitvec(g->node_flags, peer_sglayv(lays)->node_id); }
 		reverse_flip_sglayv(g, lays);
 		while(bog_step_once_strgraph(g, lays)){ one_bitvec(g->node_flags, peer_sglayv(lays)->node_id); }
-		if(lays->size < 3) continue;
+		//if(lays->size < MIN_LAY_NODES) continue;
 		push_vplist(g->lays, lays);
 		ret ++;
 	}
 	for(i=0;i<g->lays->size;i++){
 		lays = (sglayv*)get_vplist(g->lays, i);
+		if(lays->size < MIN_LAY_NODES) continue;
 		for(j=0;j<lays->size;j++){
 			l = ref_sglayv(lays, j);
 			n = ref_sgnodev(g->nodes, l->node_id);
@@ -2711,7 +2714,9 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *dup_lay
 	ret = 0;
 	for(i=0;i<g->lays->size;i++){
 		lays = (sglayv*)get_vplist(g->lays, i);
-		is_dup = is_duplicated_layout_strgraph(g, lays, similar_unitig_cov, hash, vec, &dup_utg, &dup_cov);
+		if(lays->size < MIN_LAY_NODES){
+			is_dup = 1; dup_utg = 19830203; dup_cov = 0.0;
+		} else is_dup = is_duplicated_layout_strgraph(g, lays, similar_unitig_cov, hash, vec, &dup_utg, &dup_cov);
 		recurit_contained_reads_strgraph(g, lays, tmp);
 		len = length_sglayv(g, lays);
 		if(is_dup){
@@ -2781,7 +2786,7 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *dup_lay
 		ctg->size = len;
 		print_pretty_seq(is_dup? out_dup : out_utg, ctg, 100);
 	}
-	fprintf(stdout, "[%s] output %u indepentent unitigs\n", date(), ret);
+	fprintf(stdout, "[%s] output %u independent unitigs\n", date(), ret);
 	free_string(seq);
 	free_string(ctg);
 	free_sglayv(tmp);
@@ -2813,6 +2818,7 @@ int usage(){
 	" -R          Use number of matches as alignment score\n"
 	" -r <float>  Best score cutoff, say best overlap MUST have alignment score >= <-r> * read's best score [0.95]\n"
 	" -q <float>  Minimum coverage for similar unitig detection, say the aligned length of unitig A by unitig B, divided by total length of unitig A, [0.4]\n"
+	" -u <int>    Min nodes of a layout to be output as independent unitig, [4]\n"
 	//" -v <float>  Length variance between two long reads in the aligned region, [0.05]\n"
 	" -B <int>    Maximum step in tracing bubbles, [20]\n"
 	" -S <float>  Variance threshold of (alignment score / overlap) between ture and false overlaps, [0.50]\n"
@@ -2874,7 +2880,7 @@ int main(int argc, char **argv){
 	force_overwrite = 0;
 	dot_idx = 0;
 	commands = "gCwgBgRURg";
-	while((c = getopt(argc, argv, "hfi:b:C:j:s:m:w:o:Rr:q:v:c:B:S:Q:")) != -1){
+	while((c = getopt(argc, argv, "hfi:b:C:j:s:m:w:o:Rr:q:u:v:c:B:S:Q:")) != -1){
 		switch(c){
 			case 'h': return usage();
 			case 'f': force_overwrite = 1; break;
@@ -2889,6 +2895,7 @@ int main(int argc, char **argv){
 			case 'R': mat_score = 1; break;
 			case 'r': best_score_cutoff = atof(optarg); break;
 			case 'q': utg_sm = atof(optarg); break;
+			case 'u': MIN_LAY_NODES = atof(optarg); break;
 			case 'v': len_var = atof(optarg); break;
 			case 'c': edgecov_cutoff = atoi(optarg); break;
 			case 'S': score_var = atof(optarg); break;
