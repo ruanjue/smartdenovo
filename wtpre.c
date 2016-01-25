@@ -99,7 +99,7 @@ int main(int argc, char **argv){
 					if(f){
 						break;
 					} else {
-						f = 1;
+						size --; f = 1;
 					}
 				} else if(seq->tag.string[size-1] == '/'){
 					if(f == 1){
