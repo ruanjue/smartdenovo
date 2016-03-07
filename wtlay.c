@@ -22,6 +22,7 @@
 
 static uint32_t MERGE_BUBBLE_MAX_STEP = 20;
 static uint32_t CUT_LOOP_MAX_STEP     = 5;
+static uint32_t MIN_LAY_NODES = 4;
 
 define_list(f32list, float);
 
@@ -1194,6 +1195,41 @@ int cut_nasty_jump_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int d
 	return 1;
 }
 
+/*
+* n1 and n2 is connected by only n0, but n1 and n2 has their other connective paths, n0 is chimeric
+*/
+int mask_chimeric_node_best_overlap_strgraph(StringGraph *g, uint32_t node_id){
+	sg_node_t *n, *n1, *n2;
+	sg_edge_t *e, *e1, *e2;
+	uint32_t i, k;
+	n = ref_sgnodev(g->nodes, node_id);
+	if(n->bogs[1][0][0] + n->bogs[1][0][1] != 1) return 0; // n0 must has forward edge to n1
+	if(n->bogs[1][1][0] + n->bogs[1][1][1] != 1) return 0; // n0 must has backward edge to n2
+	e1 = first_living_edge_strgraph(g, node_id, 0);
+	e2 = first_living_edge_strgraph(g, node_id, 1);
+	n1 = ref_sgnodev(g->nodes, e1->node_id);
+	k = !e1->dir;
+	for(i=0;i<n1->edge_cnts[k];i++){
+		e = ref_sgedgev(g->edges, n1->edge_offs[k] + i);
+		//if(e->node_id == e2->node_id && e->dir == e2->dir) return 0;
+		if(e->node_id == e2->node_id) return 0; // n1 and n2 is conntective
+	}
+	//whether n1 has its alternative path
+	if(n1->bogs[0][e1->dir][1] + n1->bogs[1][!e1->dir][1] + n1->bogs[1][!e1->dir][0] <= 1) return 0;
+	//whether n2 has its alternative path
+	n2 = ref_sgnodev(g->nodes, e2->node_id);
+	if(n2->bogs[0][e2->dir][1] + n2->bogs[1][!e2->dir][1] + n2->bogs[1][!e2->dir][0] <= 1) return 0;
+	// found chimera, mask it
+	for(k=0;k<2;k++){
+		for(i=0;i<n->edge_cnts[k];i++){
+			e = ref_sgedgev(g->edges, n->edge_offs[k] + i);
+			cut_edge_bog_strgraph(g, e);
+		}
+	}
+	one_bitvec(g->node_status, node_id);
+	return 1;
+}
+
 int repair_lonely_one_way_edge_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n2;
 	sg_edge_t *e1;
@@ -1838,9 +1874,9 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 	uuhash *hash;
 	tracev *bts[2];
 	sg_node_t *n;
-	unsigned long long tip, rep, bub, single, rec, flag;
+	unsigned long long tip, bub, single, rec, chi, flag;
 	uint32_t node_id;
-	tip = rep = bub = single = rec = 0;
+	tip = bub = single = rec = chi = 0;
 	for(node_id=0;node_id<g->nodes->size;node_id++){
 		if(is_dead_node_strgraph(g, node_id)) continue;
 		n = ref_sgnodev(g->nodes, node_id);
@@ -1951,8 +1987,14 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		n = ref_sgnodev(g->nodes, node_id);
 		flag = pack_bogs_flag_strgraph(n);
 		switch(flag){
-			case 0x0100000100010100LLU: rep += repair_jump_core_best_overlap_strgraph(g, node_id, 0); break;
-			case 0x0001010001000001LLU: rep += repair_jump_core_best_overlap_strgraph(g, node_id, 1); break;
+			case 0x0100000100010100LLU: chi += repair_jump_core_best_overlap_strgraph(g, node_id, 0); break;
+			case 0x0001010001000001LLU: chi += repair_jump_core_best_overlap_strgraph(g, node_id, 1); break;
+		}
+	}
+	if(1){
+		for(node_id=0;node_id<g->nodes->size;node_id++){
+			if(is_dead_node_strgraph(g, node_id)) continue;
+			chi += mask_chimeric_node_best_overlap_strgraph(g, node_id);
 		}
 	}
 	for(node_id=0;node_id<g->nodes->size;node_id++){
@@ -1960,8 +2002,8 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		n = ref_sgnodev(g->nodes, node_id);
 		flag = pack_bogs_flag_strgraph(n);
 		switch(flag){
-			case 0x0100000000010100LLU: rep += cut_nasty_jump_best_overlap_strgraph(g, node_id, 0); break;
-			case 0x0000010001000001LLU: rep += cut_nasty_jump_best_overlap_strgraph(g, node_id, 1); break;
+			case 0x0100000000010100LLU: chi += cut_nasty_jump_best_overlap_strgraph(g, node_id, 0); break;
+			case 0x0000010001000001LLU: chi += cut_nasty_jump_best_overlap_strgraph(g, node_id, 1); break;
 		}
 	}
 	bub += cut_loops_bog_strgraph(g);
@@ -1975,8 +2017,8 @@ uint64_t repair_best_overlap_strgraph(StringGraph *g){
 		}
 	}
 	rec += recover_paired_dead_ends_bog_strgraph(g);
-	fprintf(stdout, "%llu tips, %llu bubbles, %llu repeats, %llu singletons, %llu recoveries\n", tip, bub, rep, single, rec);
-	return tip + rep + bub + single + rec;
+	fprintf(stdout, "%llu tips, %llu bubbles, %llu chimera, %llu non-bog, %llu recoveries\n", tip, bub, chi, single, rec);
+	return tip + bub + single + rec;
 }
 
 uint32_t cut_read_tips_strgraph(StringGraph *g){
@@ -2459,6 +2501,7 @@ uint32_t gen_unitigs_layout_strgraph(StringGraph *g){
 	for(node_id=0;node_id<g->nodes->size;node_id++){
 		if(is_dead_node_strgraph(g, node_id)) continue;
 		if(get_bitvec(g->node_flags, node_id)) continue;
+		if(g->rdlens->buffer[node_id] == 0) continue;
 		lays = init_sglayv(32);
 		l = next_ref_sglayv(lays);
 		l->node_id = node_id;
@@ -2470,12 +2513,13 @@ uint32_t gen_unitigs_layout_strgraph(StringGraph *g){
 		while(bog_step_once_strgraph(g, lays)){ one_bitvec(g->node_flags, peer_sglayv(lays)->node_id); }
 		reverse_flip_sglayv(g, lays);
 		while(bog_step_once_strgraph(g, lays)){ one_bitvec(g->node_flags, peer_sglayv(lays)->node_id); }
-		if(lays->size < 3) continue;
+		//if(lays->size < MIN_LAY_NODES) continue;
 		push_vplist(g->lays, lays);
 		ret ++;
 	}
 	for(i=0;i<g->lays->size;i++){
 		lays = (sglayv*)get_vplist(g->lays, i);
+		if(lays->size < MIN_LAY_NODES) continue;
 		for(j=0;j<lays->size;j++){
 			l = ref_sglayv(lays, j);
 			n = ref_sgnodev(g->nodes, l->node_id);
@@ -2670,7 +2714,9 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *dup_lay
 	ret = 0;
 	for(i=0;i<g->lays->size;i++){
 		lays = (sglayv*)get_vplist(g->lays, i);
-		is_dup = is_duplicated_layout_strgraph(g, lays, similar_unitig_cov, hash, vec, &dup_utg, &dup_cov);
+		if(lays->size < MIN_LAY_NODES){
+			is_dup = 1; dup_utg = 19830203; dup_cov = 0.0;
+		} else is_dup = is_duplicated_layout_strgraph(g, lays, similar_unitig_cov, hash, vec, &dup_utg, &dup_cov);
 		recurit_contained_reads_strgraph(g, lays, tmp);
 		len = length_sglayv(g, lays);
 		if(is_dup){
@@ -2740,7 +2786,7 @@ void output_unitigs_layout_strgraph(StringGraph *g, FILE *out_lay, FILE *dup_lay
 		ctg->size = len;
 		print_pretty_seq(is_dup? out_dup : out_utg, ctg, 100);
 	}
-	fprintf(stdout, "[%s] output %u indepentent unitigs\n", date(), ret);
+	fprintf(stdout, "[%s] output %u independent unitigs\n", date(), ret);
 	free_string(seq);
 	free_string(ctg);
 	free_sglayv(tmp);
@@ -2772,6 +2818,7 @@ int usage(){
 	" -R          Use number of matches as alignment score\n"
 	" -r <float>  Best score cutoff, say best overlap MUST have alignment score >= <-r> * read's best score [0.95]\n"
 	" -q <float>  Minimum coverage for similar unitig detection, say the aligned length of unitig A by unitig B, divided by total length of unitig A, [0.4]\n"
+	" -u <int>    Min nodes of a layout to be output as independent unitig, [4]\n"
 	//" -v <float>  Length variance between two long reads in the aligned region, [0.05]\n"
 	" -B <int>    Maximum step in tracing bubbles, [20]\n"
 	" -S <float>  Variance threshold of (alignment score / overlap) between ture and false overlaps, [0.50]\n"
@@ -2833,7 +2880,7 @@ int main(int argc, char **argv){
 	force_overwrite = 0;
 	dot_idx = 0;
 	commands = "gCwgBgRURg";
-	while((c = getopt(argc, argv, "hfi:b:C:j:s:m:w:o:Rr:q:v:c:B:S:Q:")) != -1){
+	while((c = getopt(argc, argv, "hfi:b:C:j:s:m:w:o:Rr:q:u:v:c:B:S:Q:")) != -1){
 		switch(c){
 			case 'h': return usage();
 			case 'f': force_overwrite = 1; break;
@@ -2848,6 +2895,7 @@ int main(int argc, char **argv){
 			case 'R': mat_score = 1; break;
 			case 'r': best_score_cutoff = atof(optarg); break;
 			case 'q': utg_sm = atof(optarg); break;
+			case 'u': MIN_LAY_NODES = atof(optarg); break;
 			case 'v': len_var = atof(optarg); break;
 			case 'c': edgecov_cutoff = atoi(optarg); break;
 			case 'S': score_var = atof(optarg); break;

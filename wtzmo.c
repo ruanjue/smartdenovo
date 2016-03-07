@@ -31,7 +31,8 @@
 #define DO_NOTHING	0
 
 #define HZMH_KMER_MOD	1024
-#define hzmh_kmer_smear(K) ((K) ^ ((K) >> 4) ^ ((K) >> 7) ^ ((K) >> 12))
+//#define hzmh_kmer_smear(K) ((K) ^ ((K) >> 4) ^ ((K) >> 7) ^ ((K) >> 12))
+#define hzmh_kmer_smear(K) __lh3_Jenkins_hash_int((uint32_t)K)
 
 #define HZM_MAX_SEED_KMER	32
 
@@ -102,6 +103,7 @@ typedef struct {
 	u64hash  *closed_alns;
 	u32list  *rdcovs;
 	int hk, hz;
+	uint32_t hzmh_kmer_mod;
 	uint32_t ksize, zsize, n_idx, kwin, kstep, kovl, ksave, ztot, zovl, max_kmer_freq, max_zmer_freq, max_kmer_var;
 	float    win_rep_norm, win_rep_cutoff;
 	uint32_t avg_rdlen;
@@ -115,6 +117,8 @@ typedef struct {
 	uint32_t max_unalign_in_dovetail;
 	float skip_contained;
 	int best_overlap;
+	int dot_matrix, xvar, yvar, min_block_len, max_overhang;
+	float deviation_penalty, gap_penalty;
 	int debug;
 } WTZMO;
 
@@ -123,26 +127,27 @@ WTZMO* init_wtzmo(uint32_t ksize, uint32_t zsize, int w, int W, int M, int X, in
 	int i;
 	wt = malloc(sizeof(WTZMO));
 	wt->rdseqs = init_basebank();
-	wt->reads  = init_pbreadv(1024);
+	wt->reads  = init_pbreadv(64);
 	wt->rdname2id = init_cuhash(1023);
-	wt->seeds = init_hzminv(1024);
+	wt->seeds = init_hzminv(64);
 	for(i=0;i<HZMH_KMER_MOD;i++){
 		wt->hashs[i] = init_hzmhash(1023);
 	}
-	wt->masked = init_bitvec(1024);
-	wt->needed = init_bitvec(1024);
+	wt->masked = init_bitvec(64);
+	wt->needed = init_bitvec(64);
 	wt->closed_alns = init_u64hash(1023);
-	wt->rdcovs = init_u32list(1024);
-	wt->rdhits = init_vplist(1024);
+	wt->rdcovs = init_u32list(64);
+	wt->rdhits = init_vplist(64);
 	wt->n_rd = 0;
 	wt->n_qr = 0;
 	wt->n_idx = 1;
+	wt->ksave = 1;
+	wt->hzmh_kmer_mod = HZMH_KMER_MOD * wt->ksave;
 	wt->ksize = ksize;
 	wt->zsize = zsize;
 	wt->kwin  = 500;
 	wt->kstep = 0;
 	wt->kovl  = 200;
-	wt->ksave = 0;
 	wt->ztot  = 200;
 	wt->zovl  = 100;
 	wt->win_rep_norm   = 10;
@@ -169,6 +174,13 @@ WTZMO* init_wtzmo(uint32_t ksize, uint32_t zsize, int w, int W, int M, int X, in
 	wt->max_unalign_in_contained = 0;
 	wt->max_unalign_in_dovetail  = 200;
 	wt->best_overlap = 0;
+	wt->dot_matrix = 0;
+	wt->xvar = 256;
+	wt->yvar = 32;
+	wt->min_block_len = 512;
+	wt->max_overhang = 256;
+	wt->deviation_penalty = 0.1;
+	wt->gap_penalty = 0.01;
 	wt->debug = 0;
 	return wt;
 }
@@ -254,8 +266,9 @@ if(midx->task == 1){
 			if(krev == kmer) continue;
 			dir  = krev > kmer? 0 : 1;
 			krev = krev > kmer? kmer : krev;
-			if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-			kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+			//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+			kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+			if(kidx >= HZMH_KMER_MOD) continue;
 			if((kidx % ncpu) != tidx) continue;
 			U.mer = krev;
 			u = prepare_hzmhash(wt->hashs[kidx], U, &exists);
@@ -290,8 +303,9 @@ if(midx->task == 1){
 			if(krev == kmer) continue;
 			dir  = krev > kmer? 0 : 1;
 			krev = krev > kmer? kmer : krev;
-			if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-			kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+			//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+			kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+			if(kidx >= HZMH_KMER_MOD) continue;
 			if((kidx % ncpu) != tidx) continue;
 			U.mer = krev;
 			u = get_hzmhash(wt->hashs[kidx], U);
@@ -379,12 +393,14 @@ void index_wtzmo(WTZMO *wt, uint32_t beg, uint32_t end, uint32_t ncpu){
 		reset_iter_hzmhash(wt->hashs[i]);
 		while((u = ref_iter_hzmhash(wt->hashs[i]))){
 			ktot += u->cnt;
-			if(u->cnt > wt->max_kmer_freq){ u->cnt = wt->max_kmer_freq; nflt ++; }
+			//if(u->cnt > wt->max_kmer_freq){ u->cnt = wt->max_kmer_freq; nflt ++; }
+			if(u->cnt > wt->max_kmer_freq){ u->cnt = 0; u->flt = 1; nflt ++; }
 			{
 				u->off = off;
 				off += u->cnt;
+				if(u->cnt <= 1) u->flt = 1;
+				else nrem ++;
 				u->cnt = 0;
-				nrem ++;
 			}
 		}
 		ktyp += wt->hashs[i]->count;
@@ -417,11 +433,12 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 	hzm_t *p1, P1;
 	hzmin_t *p2, P2;
 	uint64_t kmer, krev, kmask, off, x1, x2;
-	uint32_t i, j, pblen, ol, lst, kidx, id1, id2, cnt, dir;
-	uint8_t b, c;
+	uint32_t i, j, pblen, pblen_up, ol, lst, kidx, id1, id2, cnt, dir;
+	uint8_t b, c, has_next;
 	kmask = 0xFFFFFFFFFFFFFFFFLLU >> ((32 - wt->ksize) << 1);
 	rd = ref_pbreadv(wt->reads, pbid);
 	pblen = rd->rdlen;
+	pblen_up = pblen * 1.2;
 	R.p1 = (hzm_t){0xFFFFFFFFU, 0, 0, 0};
 	P2 = (hzmin_t){0x7FFFFFFFU, 0};
 	R.p2 = &P2;
@@ -445,8 +462,10 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		if(krev == kmer) continue;
 		p1->dir  = krev > kmer? 0 : 1;
 		krev = krev > kmer? kmer : krev;
-		if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
-		kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+		//if(wt->ksave && (krev & 0x03) > 1) continue; // skip G and T
+		//kidx = hzmh_kmer_smear(krev) % HZMH_KMER_MOD;
+		kidx = hzmh_kmer_smear(krev) % wt->hzmh_kmer_mod;
+		if(kidx >= HZMH_KMER_MOD) continue;
 		h = get_hzmhash(wt->hashs[kidx], (hzmh_t){krev, 0, 0, 0});
 		if(h == NULL) continue;
 		if(wt->debug > 3){
@@ -463,7 +482,7 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		while(r->beg < r->end){
 			r->p2 = ref_hzminv(wt->seeds, r->beg ++);
 			if(r->p2->rd_id == pbid) continue;
-			if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen) continue;
+			if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen_up) continue;
 			array_heap_push(heap->buffer, heap->size, heap->cap, uint32_t, refs->size - 1, heap_cmp_hz_ref_macro(refs, a, b));
 			break;
 		}
@@ -475,12 +494,26 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 	dir = 0;
 	x1 = x2 = 0xFFFFFFFF00000000LLU;
 	while(1){
-		id1 = array_heap_pop(heap->buffer, heap->size, heap->cap, uint32_t, heap_cmp_hz_ref_macro(refs, a, b));
-		if(id1 != 0xFFFFFFFFU){
+		if(heap->size){
+			id1 = heap->buffer[0];
 			r = ref_hzrefv(refs, id1);
-		} else r = &R;
-		p1 = &r->p1;
-		p2 = r->p2;
+			p1 = &r->p1;
+			p2 = r->p2;
+			has_next = 0;
+			while(r->beg < r->end){
+				r->p2 = ref_hzminv(wt->seeds, r->beg ++);
+				if(r->p2->rd_id == pbid) continue;
+				if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen_up) continue;
+				array_heap_replace(heap->buffer, heap->size, heap->cap, uint32_t, 0, id1, heap_cmp_hz_ref_macro(refs, a, b));
+				has_next = 1;
+				break;
+			}
+			if(has_next == 0) array_heap_remove(heap->buffer, heap->size, heap->cap, uint32_t, 0, heap_cmp_hz_ref_macro(refs, a, b));
+		} else {
+			id1 = 0xFFFFFFFFU;
+			p1 = &R.p1;
+			p2 = R.p2;
+		}
 		if(id2 != p2->rd_id || dir != p2->dir){
 			if(id2 != 0xFFFFFFFFU){
 				if(ol >= wt->kovl){
@@ -490,10 +523,12 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 					else {
 						if(candidates->size >= wt->ncand){
 							if((candidates->buffer[0] & 0xFFFFFFFFU) < ol){
-								array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
+								array_heap_replace(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0, x1,
 									((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
-								array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
-									((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+								//array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
+									//((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+								//array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
+									//((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
 							}
 						} else {
 							array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
@@ -520,20 +555,17 @@ void query_wtzmo(WTZMO *wt, uint32_t pbid, u64list *candidates, hzrefv *refs, u3
 		else ol += p1->off + p1->len - lst;
 		lst = p1->off + p1->len;
 		cnt ++;
-		while(r->beg < r->end){
-			r->p2 = ref_hzminv(wt->seeds, r->beg ++);
-			if(r->p2->rd_id == pbid) continue;
-			//if(wt->reads->buffer[r->p2->rd_id].rdlen > pblen) continue;
-			array_heap_push(heap->buffer, heap->size, heap->cap, uint32_t, id1, heap_cmp_hz_ref_macro(refs, a, b));
-			break;
-		}
 	}
-	if(x1 != 0xFFFFFFFF00000000LLU){
-		if(candidates->size >= wt->ncand) array_heap_remove(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0,
-			((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+	if(candidates->size >= wt->ncand){
+		if((candidates->buffer[0] & 0xFFFFFFFFU) < ol){
+			array_heap_replace(candidates->buffer, candidates->size, candidates->cap, uint64_t, 0, x1,
+				((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
+		}
+	} else {
 		array_heap_push(candidates->buffer, candidates->size, candidates->cap, uint64_t, x1,
 			((a & 0xFFFFFFFFU) > (b & 0xFFFFFFFFU))? 1 : (((a & 0xFFFFFFFFU) < (b & 0xFFFFFFFFU))? -1 : 0));
 	}
+	//if(candidates->size != 7777777) candidates->size = 0; // TODO DEBUG
 }
 
 typedef struct {
@@ -555,12 +587,12 @@ static inline SimpMSA* init_simpMSA(WTZMO *wt, float min_allele_freq, uint32_t m
 	msa->rdlen = 0;
 	msa->rdids = init_u32list(64);
 	msa->alnoffs = init_u32list(64);
-	msa->bases[0] = init_u32list(1024);
-	msa->bases[1] = init_u32list(1024);
-	msa->bases[2] = init_u32list(1024);
-	msa->bases[3] = init_u32list(1024);
-	msa->solid = init_bitvec(1024);
-	msa->matrix = init_vplist(1024);
+	msa->bases[0] = init_u32list(64);
+	msa->bases[1] = init_u32list(64);
+	msa->bases[2] = init_u32list(64);
+	msa->bases[3] = init_u32list(64);
+	msa->solid = init_bitvec(64);
+	msa->matrix = init_vplist(64);
 	msa->min_freq = min_allele_freq;
 	msa->min_mac  = min_allele_count;
 	return msa;
@@ -689,10 +721,11 @@ hzrefv *refs;
 hzmhv *zhash;
 hzmv *zseeds;
 BitVec *zbits;
-wtseedv *seeds, *windows, *windows2;
+wtseedv *seeds, *windows, *windows2, *wins[2];
 wt_seed_t *seed, SEED[2];
 wt_seed_t *zp;
-hzmpv  *cache, *anchors, *anchors2;
+hzmpv  *cache, *anchors, *anchors2, *dst[2];
+diagv *diags;
 wtovlv *hits;
 u32hash *masked;
 String *cigar_str;
@@ -705,11 +738,14 @@ f4v *weights;
 u32list *hzoff;
 alnregv *regs;
 aln_reg_t REG;
+u4v *block, *grps;
 u8list *rdseq, *hzseq, *pb1, *pb2;
 u8list *mem_pbseq, *mem_cache[2];
 u32list *mem_cigar, *cigar_cache, *cigars;
+u1v * kcnts;
 SimpMSA *msa;
 u8list *mseq;
+kswr_t r;
 uint64_t val;
 uint32_t i, j, k, dir, id2, x1, x2, x3, x4, ol, pbid, *ptr, bcov, ncand, nbest;
 double avg;
@@ -719,33 +755,42 @@ hits = mzmo->hits;
 masked = init_u32hash(1023);
 seeds = mzmo->seeds;
 windows = mzmo->windows;
-windows2 = init_wtseedv(1024);
-cache = init_hzmpv(1024);
-anchors = init_hzmpv(1024);
-anchors2 = init_hzmpv(1024);
+windows2 = init_wtseedv(64);
+cache = init_hzmpv(64);
+anchors = init_hzmpv(64);
+anchors2 = init_hzmpv(64);
 hit = &HIT;
-pb1 = init_u8list(1024);
-pb2 = init_u8list(1024);
-cigar_str = init_string(1024);
-rdseq = init_u8list(1024);
-hzseq = init_u8list(1024);
-hzoff = init_u32list(1024);
-heap = init_u32list(1024);
-refs = init_hzrefv(1024);
+pb1 = init_u8list(64);
+pb2 = init_u8list(64);
+cigar_str = init_string(64);
+rdseq = init_u8list(64);
+hzseq = init_u8list(64);
+hzoff = init_u32list(64);
+heap = init_u32list(64);
+refs = init_hzrefv(64);
 zhash = init_hzmhv(1023);
-zseeds = init_hzmv(1024);
-windeps = init_u16list(1024);
-weights = init_f4v(1024);
-mem_pbseq = init_u8list(1024);
-mem_cache[0] = init_u8list(1024);
-mem_cache[1] = init_u8list(1024);
-cigars = init_u32list(1024);
-mem_cigar = init_u32list(1024);
-cigar_cache = init_u32list(1024);
+zseeds = init_hzmv(64);
+windeps = init_u16list(64);
+weights = init_f4v(64);
+mem_pbseq = init_u8list(64);
+mem_cache[0] = init_u8list(64);
+mem_cache[1] = init_u8list(64);
+cigars = init_u32list(64);
+mem_cigar = init_u32list(64);
+cigar_cache = init_u32list(64);
 memset(&SEED[0], 0, sizeof(wt_seed_t));
 memset(&SEED[1], 0, sizeof(wt_seed_t));
-regs = init_alnregv(1024);
+kcnts = init_u1v(1024);
+regs = init_alnregv(64);
 msa = init_simpMSA(wt, 0.20, 4);
+//for dot matrix alignment
+dst[0] = init_hzmpv(64);
+dst[1] = init_hzmpv(64);
+wins[0] = init_wtseedv(64);
+wins[1] = init_wtseedv(64);
+diags = init_diagv(64);
+block = init_u4v(64);
+grps  = init_u4v(64);
 
 thread_beg_loop(mzmo);
 if(DO_NOTHING) continue;
@@ -755,7 +800,7 @@ if(nbest < wt->nbest) nbest = wt->nbest;
 if(mzmo->bcov >= nbest) break;
 alen = wt->reads->buffer[pbid].rdlen;
 if(wt->rdhits->size) candidates = (u64list*)get_vplist(wt->rdhits, pbid);
-else candidates = init_u64list(1024);
+else candidates = init_u64list(64);
 query_wtzmo(wt, pbid, candidates, refs, heap, hzoff);
 thread_beg_syn_read(mzmo);
 for(i=0;i<candidates->size;i++){
@@ -789,7 +834,7 @@ encap_f4v(weights, wt->reads->buffer[pbid].rdlen);
 zbits  = init_bitvec(0xFFFFFFFFFFFFFFFFLLU >> ((32 - wt->zsize) << 1));
 clear_and_encap_u8list(pb1, alen);
 bitseq_basebank(wt->rdseqs, wt->reads->buffer[pbid].rdoff, alen, pb1->buffer);
-index_single_read_seeds(pb1->buffer, alen, wt->zsize, wt->hz, 64, zhash, zbits, zseeds, hzoff);
+index_single_read_seeds(pb1->buffer, alen, wt->zsize, wt->hz, wt->max_zmer_freq, zhash, zbits, zseeds, hzoff);
 for(i=0;i<candidates->size;i++){
 	id2 = get_u64list(candidates, i) >> 32;
 	//if(exists_u64hash(wt->closed_alns, ovl_uniq_long_id(pbid, id2, 0))) continue;
@@ -797,12 +842,41 @@ for(i=0;i<candidates->size;i++){
 	blen = wt->reads->buffer[id2].rdlen;
 	clear_and_encap_u8list(pb2, blen);
 	bitseq_basebank(wt->rdseqs, wt->reads->buffer[id2].rdoff, blen, pb2->buffer);
-	query_single_read_seeds(pb2->buffer, blen, wt->zsize, wt->hz, wt->max_kmer_var, zhash, zbits, zseeds, hzoff, cache);
+	query_single_read_seeds(pb2->buffer, blen, wt->zsize, wt->hz, wt->max_zmer_freq, wt->max_kmer_var, zhash, zbits, zseeds, hzoff, kcnts, cache);
 	if(wt->debug > 2){
 		fprintf(zmo_debug_out, "Query\t%s\t%d\n", wt->reads->buffer[id2].rdname, (int)cache->size);
 	}
 	if(cache->size * wt->zsize < wt->ztot) continue;
-	process_hzmps(cache, wt->reads->buffer[id2].rdlen);
+	if(wt->dot_matrix){
+		val = ovl_uniq_long_id(id2, pbid, 0);
+		push_u64list(mzmo->closed, val);
+		r = dot_matrix_align_hzmps(cache, dst, wins, diags, block, grps, mem_cache[0], alen, blen, wt->xvar, wt->yvar, wt->min_block_len, wt->max_overhang, wt->deviation_penalty, wt->gap_penalty);
+		ol = num_max(r.qe - r.qb, r.te - r.tb);
+		if(r.score >= wt->min_score && r.score >= (int)(wt->min_id * ol)){
+			HIT.pb1  = pbid;
+			HIT.pb2  = id2;
+			HIT.dir1 = 0;
+			HIT.dir2 = r.score2;
+			HIT.score = r.score;
+			HIT.tb   = r.tb;
+			HIT.te   = r.te;
+			HIT.qb   = r.qb;
+			HIT.qe   = r.qe;
+			HIT.mat  = r.score;
+			HIT.mis  = 0;
+			HIT.ins  = 0;
+			HIT.del  = 0;
+			HIT.aln  = ol;
+			HIT.cigar = NULL;
+			push_wtovlv(mzmo->hits, HIT);
+		}
+		if(wt->reads->size == 2 && hzm_debug){
+			// generate dot_plot.fwd.src.txt, dot_plot.fwd.dst.txt, dot_plot.rev.src.txt, dot_plot.rev.dst.txt
+			debug_dot_plot_hzmps(cache);
+		}
+		continue;
+	}
+	process_hzmps(cache);
 	for(dir=0;dir<2;dir++){
 		//SEED[dir].pb1 = pbid;
 		SEED[dir].pb2 = id2;
@@ -833,6 +907,10 @@ for(i=0;i<candidates->size;i++){
 }
 free_bitvec(zbits);
 if(wt->rdhits->size == 0) free_u64list(candidates);
+if(wt->dot_matrix){
+	// dot matrix mode, already finish alignment into mzmo->hits
+	continue;
+}
 if(wt->debug){
 	fprintf(zmo_debug_out, "TOTAL SEEDS: %u\n", (uint32_t)seeds->size);
 }
@@ -844,7 +922,7 @@ if(wt->win_rep_cutoff != (int)wt->win_rep_cutoff){
 	rep_cutoff = avg * wt->win_rep_cutoff;
 } else rep_cutoff = wt->win_rep_cutoff;
 */
-for(i=0;(int)i<alen;i++) 
+for(i=0;(int)i<alen;i++)
 	weights->buffer[i] = (windeps->buffer[i] <= wt->win_rep_norm)? 1.0
 		: ((windeps->buffer[i] >= wt->win_rep_cutoff)? 0.0 : wt->win_rep_norm / (float)windeps->buffer[i]);
 for(i=0;(int)i<alen;i++) weights->buffer[i] = weights->buffer[i] * (0.3 + 0.7 * (num_diff(((int)i), alen / 2) / (alen / 2.0)));
@@ -857,13 +935,17 @@ if(wt->skip_contained) clear_u32hash(masked);
 ncand = 0;
 for(i=0;i<seeds->size;i++){
 	seed = ref_wtseedv(seeds, i);
+	blen = wt->reads->buffer[seed->pb2].rdlen;
 	if(seed->closed) continue;
 	ol = 0;
 	for(j=seed->anchors[0];j<seed->anchors[1];j++){
 		zp = ref_wtseedv(windows, j);
 		if(zp->closed) continue;
 		avg = 0;
-		for(k=zp->beg[0];(int)k<zp->end[0];k++) avg += weights->buffer[k];
+		//for(k=zp->beg[0];(int)k<zp->end[0];k++) avg += weights->buffer[k];
+		avg = (zp->end[0] - zp->beg[0]) * weights->buffer[(zp->beg[0] + zp->end[0]) / 2];
+		// Consider the position of candidate
+		avg = avg * (0.3 + 0.7 * (num_diff(((int)((zp->beg[1] + zp->end[1]) / 2)), blen / 2) / (blen / 2.0)));
 		if(wt->debug > 1){
 			fprintf(zmo_debug_out, "WINREP\t%s\t%d\t%d\t%d\t%d\t%0.3f\n", wt->reads->buffer[seed->pb2].rdname, zp->beg[0], zp->end[0], zp->beg[1], zp->end[1], avg);
 		}
@@ -1067,6 +1149,13 @@ free_u32list(mem_cigar);
 free_u32list(cigar_cache);
 free_alnregv(regs);
 free_simpMSA(msa);
+free_hzmpv(dst[0]);
+free_hzmpv(dst[1]);
+free_wtseedv(wins[0]);
+free_wtseedv(wins[1]);
+free_diagv(diags);
+free_u4v(block);
+free_u4v(grps);
 thread_end_func(mzmo);
 
 //uint32_t print_hits_wtzmo(WTZMO *wt, wtseedv *seeds, wtovlv *hits, FILE *out){
@@ -1155,10 +1244,12 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	uint64_t ret;
 	uint32_t i, j, rd_id, pbbeg, pbend, i_idx, beg, end;
 	int n_cpu;
+	def_clock(secs);
 	thread_preprocess(mzmo);
 	if(wt->debug) n_cpu = 1;
 	else n_cpu = ncpu;
 	thread_beg_init(mzmo, n_cpu);
+	beg_clock(secs);
 	mzmo->wt = wt;
 	mzmo->rd_id = 0xFFFFFFFFU;
 	mzmo->bcov = 0;
@@ -1166,11 +1257,11 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	mzmo->fast_align = fast_align;
 	mzmo->just_query = 0;
 	mzmo->refine  = refine;
-	mzmo->seeds   = init_wtseedv(1024);
-	mzmo->windows = init_wtseedv(1024);
-	mzmo->hits    = init_wtovlv(1024);
+	mzmo->seeds   = init_wtseedv(64);
+	mzmo->windows = init_wtseedv(64);
+	mzmo->hits    = init_wtovlv(64);
 	mzmo->masks   = init_u32list(16);
-	mzmo->closed  = init_u64list(1024);
+	mzmo->closed  = init_u64list(64);
 	thread_end_init(mzmo);
 	ret = 0;
 
@@ -1195,7 +1286,7 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 			mzmo->just_query = 1;
 			mzmo->rd_id = rd_id;
 			thread_wake(mzmo);
-			if((j % 100) == 0){
+			if(hzm_debug == 0 && (j % 100) == 0){
 				fprintf(zmo_debug_out, "\r%u", j); fflush(zmo_debug_out);
 			}
 		}
@@ -1209,7 +1300,7 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	}
 	for(j=beg;j<end;j++){
 		rd_id = j;
-		if(((j - beg) % 100) == 0){
+		if(hzm_debug == 0 && ((j - beg) % 100) == 0){
 			fprintf(zmo_debug_out, "\r%012u\t%llu", j - beg, (unsigned long long)ret); fflush(zmo_debug_out);
 		}
 		if((rd_id % n_job) != i_job) continue;
@@ -1253,7 +1344,7 @@ uint64_t overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align, int re
 	free_u32list(mzmo->masks);
 	free_u64list(mzmo->closed);
 	thread_end_close(mzmo);
-	fprintf(zmo_debug_out, "\rprogress: %u %llu 100.00%%\n", (int)end - beg, (unsigned long long)ret); fflush(zmo_debug_out);
+	fprintf(zmo_debug_out, "\rprogress: %u %llu 100.00%%, %0.2f CPU seconds\n", (int)end - beg, (unsigned long long)ret, 1.0 * end_clock(secs) / CLOCKS_PER_SEC); fflush(zmo_debug_out);
 	return ret;
 }
 
@@ -1273,9 +1364,9 @@ uint64_t online_overlap_wtzmo(WTZMO *wt, int ncpu, int do_align, int fast_align,
 	mzmo->do_align = do_align;
 	mzmo->fast_align = fast_align;
 	mzmo->just_query = 0;
-	mzmo->seeds = init_wtseedv(1024);
-	mzmo->windows = init_wtseedv(1024);
-	mzmo->hits = init_wtovlv(1024);
+	mzmo->seeds = init_wtseedv(64);
+	mzmo->windows = init_wtseedv(64);
+	mzmo->hits = init_wtovlv(64);
 	mzmo->masks = init_u32list(16);
 	thread_end_init(mzmo);
 	ret = 0;
@@ -1355,14 +1446,22 @@ int usage(){
 	" -K <int>    Filter high frequency kmers, maybe repetitive, [0]\n"
 	"             0: set K to 5 * <average_kmer_depth>, but no less than 100\n"
 	" -d <int>    Minimum size of total seeding region for kmer windows, [300]\n"
-	" -S          Trun off memory saving of kmer index.\n"
-	"             Default, skips kmers ending with 'G' and 'T', halve the memory\n"
+	" -S <int>    Subsampling kmers, 1/<-S> kmers are indexed, [4]\n"
+	//" -S          Trun off memory saving of kmer index.\n"
+	//"             Default, skips kmers ending with 'G' and 'T', halve the memory\n"
 	" -G <int>    Build kmer index in multiple iterations to save memory, 1: once, [1]\n"
 	"             Given 10M reads having 100G bases, about 100/(4)=25G used in seq storage, about 100*(6)G=600G\n"
 	"             used in kmer-index. If -G = 10, kmer-index is divided into 10 pieces, thus taking 60G. But we need additional\n"
 	"             10M / <tot_jobs: -P> * 8 * <num_of_cand: -A> memory to store candidates to be aligned.\n"
 	" -z <int>    Smaller kmer size (z-mer), 5 <= <-z> <= %d, [10]\n"
-	" -Z <int>    Filter high frequency z-mers, maybe repetitive, [100]\n"
+	" -Z <int>    Filter high frequency z-mers, maybe repetitive, [64]\n"
+	" -U <float>  Ultra-fast dot matrix alignment, pattern search in zmer image\n"
+	"             Usage: wtzmo <other_options> -s 200 -m 0.1 -U 128 -U 64 -U 160 -U 1.0 -U 0.05\n"
+	"                                                        (1)    (2)   (3)    (4)    (5)\n"
+	"             Intra-block (1): max_gap, (2): max_deviation, (3): min_size\n"
+	"             Inter-block (4): deviation penalty, (5): gap size penalty\n"
+	"             use -U -1 instead of type six default parameters\n"
+	"             Will trun off -y -R -r -l -q -B -C -M -X -O -W -T -w -W -e -n"
 	" -y <int>    Zmer window, [800]\n"
 	" -R <int>    Minimum size of seeding region within zmer window, [200]\n"
 	" -r <int>    Minimum size of total seeding region for zmer windows, [300]\n"
@@ -1413,6 +1512,8 @@ int main(int argc, char **argv){
 	uint32_t pbid;
 	int c, ncpu, min_rdlen, w, W, ew, M, X, O, E, T, hk, hz, ksize, zsize, kwin, kstep, ksave, ztot, zovl, kovl, kcut, zcut, kvar, min_score, ncand, nbest, overwrite, debug, n_job, i_job, n_idx, best_overlap;
 	float min_id, skip_contained, do_align, fast_align, wrep, wnorm, refine;
+	int dot_matrix, xvar, yvar, min_block_len, max_overhang;
+	float deviation_penalty, gap_penalty, optval;
 	HZM_FAST_WINDOW_KMER_CHAINING = 1;
 	output = NULL;
 	pairoutf = NULL;
@@ -1435,7 +1536,7 @@ int main(int argc, char **argv){
 	kwin = 800;
 	kstep = 0;
 	kovl = 300;
-	ksave = 1;
+	ksave = 4;
 	n_idx = 1;
 	wnorm = 20;
 	wrep = 100;
@@ -1444,7 +1545,7 @@ int main(int argc, char **argv){
 	ztot = 300;
 	zovl = 200;
 	kcut = 0;
-	zcut = 100;
+	zcut = 64;
 	kvar = 2;
 	skip_contained = 1;
 	overwrite = 0;
@@ -1455,12 +1556,19 @@ int main(int argc, char **argv){
 	debug = 0;
 	n_job = 1;
 	i_job = 0;
+	dot_matrix = 0;
+	xvar = 128;
+	yvar = 64;
+	min_block_len = 160;
+	max_overhang = 256;
+	deviation_penalty = 1.0;
+	gap_penalty = 0.05;
 	pbs = init_cplist(4);
 	flts = init_cplist(4);
 	ovls = init_cplist(4);
 	obts = init_cplist(4);
 	tbas = init_cplist(4);
-	while((c = getopt(argc, argv, "ht:P:p:Ni:b:J:I:o:9:SfCH:k:G:z:Z:y:d:r:q:l:K:A:B:r:R:L:F:W:w:e:M:X:O:E:T:s:m:nv")) != -1){
+	while((c = getopt(argc, argv, "ht:P:p:Ni:b:J:I:o:9:S:fCH:k:G:z:Z:U:y:d:r:q:l:K:A:B:r:R:L:F:W:w:e:M:X:O:E:T:s:m:nv")) != -1){
 		switch(c){
 			case 'h': return usage();
 			case 't': ncpu = atoi(optarg); break;
@@ -1473,7 +1581,7 @@ int main(int argc, char **argv){
 			case 'I': push_cplist(tbas, optarg); break;
 			case 'o': output = optarg; break;
 			case '9': pairoutf = optarg; break;
-			case 'S': ksave = 0; break;
+			case 'S': ksave = atoi(optarg); break;
 			case 'f': overwrite = 1; break;
 			case 'C': skip_contained = 0; break;
 			case 'H': hk = atoi(optarg); hz = (hk >> 1) & 0x01; hk = hk & 0x01; break;
@@ -1481,6 +1589,18 @@ int main(int argc, char **argv){
 			case 'K': kcut = atoi(optarg); break;
 			case 'z': zsize = atoi(optarg); break;
 			case 'Z': zcut = atoi(optarg); break;
+			case 'U': optval = atof(optarg);
+				if(optval < 0){ dot_matrix = 5; break; }
+				switch(dot_matrix){
+					case 0: xvar = optval; break;
+					case 1: yvar = optval; break;
+					case 2: min_block_len = optval; break;
+					case 3: deviation_penalty = optval; break;
+					case 4: gap_penalty = optval; break;
+					default: dot_matrix = 5;
+				}
+				dot_matrix ++;
+				break;
 			case 'y': kwin = atoi(optarg); break;
 			case 'l': kvar = atoi(optarg); break;
 			case 'd': kovl = atof(optarg); break;
@@ -1515,6 +1635,8 @@ int main(int argc, char **argv){
 	if(pbs->size == 0) return usage();
 	if(ksize > HZM_MAX_SEED_KMER || ksize < 5) return usage();
 	if(zsize > HZM_MAX_SEED_ZMER || zsize < 5) return usage();
+	if(ksave < 1) return usage();
+	max_overhang = 2 * xvar;
 	wt = init_wtzmo(ksize, zsize, w, W, M, X, O, E, T, min_score, min_id);
 	wt->hk = hk;
 	wt->hz = hz;
@@ -1525,6 +1647,7 @@ int main(int argc, char **argv){
 	wt->ztot = ztot;
 	wt->zovl = zovl;
 	wt->ksave = ksave;
+	wt->hzmh_kmer_mod = HZMH_KMER_MOD * ksave;
 	wt->n_idx = n_idx;
 	wt->win_rep_norm   = wnorm;
 	wt->win_rep_cutoff = wrep;
@@ -1533,6 +1656,13 @@ int main(int argc, char **argv){
 	wt->max_kmer_var = kvar;
 	wt->ncand = ncand;
 	wt->nbest = nbest;
+	wt->dot_matrix = dot_matrix;
+	wt->xvar = xvar;
+	wt->yvar = yvar;
+	wt->min_block_len = min_block_len;
+	wt->max_overhang = max_overhang;
+	wt->deviation_penalty = deviation_penalty;
+	wt->gap_penalty = gap_penalty;
 	wt->debug = debug;
 	hzm_debug = debug;
 	if((fr = fopen_m_filereader(pbs->size, pbs->buffer)) == NULL){

@@ -38,6 +38,7 @@
 #define num_cmpgt(a, b) ((a) > (b))
 #define num_cmpx(a, b, c, d) (((a) > (b))? 1 : (((a) < (b))? -1 : (((c) > (d))? 1 : (((c) < (d))? -1 : 0))))
 #define num_cmpgtx(a, b, c, d) (((a) > (b))? 1 : (((a) < (b))? 0 : (((c) > (d)))))
+#define num_abs(n) ((n) < 0? -(n) : (n))
 
 static inline size_t roundup_power2(size_t v){
 	if(v == 0) return 0;
@@ -108,6 +109,26 @@ do {	\
 	size_t swap, idx, a, b;	\
 	idx = (size_t)(_idx);	\
 	(ary)[idx] = (ary)[--(len)];	\
+	while((size_t)((idx << 1) + 1) < (size_t)(len)){	\
+		swap = idx;	\
+		a = (ary)[swap]; b = (ary)[(idx << 1) + 1];	\
+		if((cmp_expr) > 0) swap = (idx << 1) + 1;	\
+		if(((idx << 1) + 2) < (size_t)(len)){	\
+			a = (ary)[swap]; b = (ary)[(idx << 1) + 2];	\
+			if((cmp_expr) > 0) swap = (idx << 1) + 2;	\
+		}	\
+		if(swap == idx) break;	\
+		pp = (ary)[idx]; (ary)[idx] = (ary)[swap]; (ary)[swap] = pp;	\
+		idx = swap;	\
+	}	\
+} while(0)
+
+#define array_heap_replace(ary, len, cap, e_type, _idx, _val, cmp_expr)\
+do {	\
+	e_type pp;	\
+	size_t swap, idx, a, b;	\
+	idx = (size_t)(_idx);	\
+	(ary)[idx] = _val;	\
 	while((size_t)((idx << 1) + 1) < (size_t)(len)){	\
 		swap = idx;	\
 		a = (ary)[swap]; b = (ary)[(idx << 1) + 1];	\
@@ -494,5 +515,51 @@ static inline size_t cplist_deep_obj_desc_cnt(void *list, int idx){
 	else return 1;
 }
 static const obj_desc_t cplist_deep_obj_desc = {.size = sizeof(cplist), .n_child = 1, .mem_type = {3}, .addr = {offsetof(cplist, buffer)}, .desc = {(struct obj_desc_t*)&OBJ_DESC_CHAR_ARRAY}, .cnt = cplist_deep_obj_desc_cnt};
+
+#define define_recycle_list_array(name, list_type)	\
+typedef struct {	\
+	vplist *array;	\
+	vplist *dustbin;	\
+} name;	\
+	\
+static inline name* init_##name(){	\
+	name *g;	\
+	g = (name*)malloc(sizeof(name));	\
+	g->buffer = init_vplist(4);	\
+	g->dustbin = init_vplist(4);	\
+	return g;	\
+}	\
+	\
+static inline void free_##name(name *g){	\
+	list_type *v;	\
+	size_t i;	\
+	for(i=0;i<g->array->size;i++){	\
+		v = (list_type*)get_vplist(g->array, i);	\
+		if(v) free_##list_type(v);	\
+	}	\
+	for(i=0;i<g->dustbin->size;i++){	\
+		v = (list_type*)get_vplist(g->dustbin, i);	\
+		if(v) free_##list_type(v);	\
+	}	\
+	free_vplist(g->array);	\
+	free_vplist(g->dustbin);	\
+	free(g);	\
+}	\
+	\
+static inline list_type* fetch_##name(name *g){	\
+	list_type *v;	\
+	if(g->dustbin->size) v = (list_type*)g->dustbin->buffer[--g->dustbin->size];	\
+	else v = init_##list_type(4);	\
+	return v;	\
+}	\
+	\
+static inline void recyc_##name(name *g, list_type *v){	\
+	push_vplist(g->dustbin, v);	\
+}	\
+	\
+static inline void recyc_all_##name(name *g, vplist *vs){	\
+	append_vplist(g->dustbin, vs);	\
+	vs->size = 0;	\
+}
 
 #endif

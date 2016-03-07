@@ -258,7 +258,7 @@ int parse_overlap_item_strgraph(StringGraph *g, FileReader *fr, OverlapData *dat
 		dat->dir[1] = (get_col_str(fr, 6)[0] == '-');
 		pb2 = atoi(get_col_str(fr, 7));
 		if(pb2 != (int)g->rdlens->buffer[dat->node_id[1]]){
-			fprintf(stderr, " -- Inconsistent read (%s) length %d != %d in %s -- %s:%d --\n", get_col_str(fr, 7), g->rdlens->buffer[dat->node_id[1]], pb2, __FUNCTION__, __FILE__, __LINE__);
+			fprintf(stderr, " -- Inconsistent read (%s) length %d != %d in %s -- %s:%d --\n", get_col_str(fr, 5), g->rdlens->buffer[dat->node_id[1]], pb2, __FUNCTION__, __FILE__, __LINE__);
 			exit(1);
 		}
 		dat->beg[1] = atoi(get_col_str(fr, 8));

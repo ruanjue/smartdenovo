@@ -36,3 +36,13 @@ It calls other SMARTdenovo executables in the same directory containing
 more about how SMARTdenovo works in detail, please see [README-tools.md][rt].
 
 [rt]: README-tools.md
+
+## New development
+
+Most time of assembly is spent on Smith-Waterm alignment, which might be not necessary
+to long reads assembly. We are developping a novel algorithm, called dot matrix alignment
+, which is smith-waterman free.
+
+wtzmo now supports dot matrix alignment by add option `-U -1 -m 0.1`. `run_dmo.sh` works
+well on E.coli, Yeast PacBio dataset, Bacteria ERS554120, and drosopila.
+

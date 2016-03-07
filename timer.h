@@ -85,8 +85,8 @@ static inline char* date(){
 	else             fprintf(out, "\r[%s] %llu\n", date(), (unsigned long long)name##_cnt);	\
 }
 
-#define define_clock(name)	clock_t name##_t0, name##_t1, name##_t2
-#define begin_clock(name)	name##_t0 = name##_t1 = name##_t2 = clock()
+#define def_clock(name)	clock_t name##_t0, name##_t1, name##_t2
+#define beg_clock(name)	name##_t0 = name##_t1 = name##_t2 = clock()
 #define read_clock(name)	(name##_t1 = name##_t2, name##_t2 = clock(), name##_t2 - name##_t1)
 #define count_clock(name)	(name##_t1 = name##_t2, name##_t2 = clock(), name##_t2 - name##_t0)
 #define end_clock(name)		(name##_t1 = name##_t2, name##_t2 = clock(), name##_t2 - name##_t0)
