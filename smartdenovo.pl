@@ -5,7 +5,7 @@ use warnings;
 use Getopt::Std;
 
 my %opts = (t=>8, e=>'dmo', k=>16, J=>5000, p=>'wtasm', c=>0);
-getopts('t:p:e:k:m:s:J:', \%opts);
+getopts('t:p:e:k:m:s:J:c:', \%opts);
 $opts{e} = lc $opts{e};
 die (qq/Usage: smartdenovo.pl [options] <reads.fa>
 Options:
