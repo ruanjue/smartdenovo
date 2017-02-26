@@ -499,6 +499,10 @@ uint64_t reduce_transitive_strgraph(StringGraph *g){
 	u32list *vec;
 	uint64_t ret;
 	uint32_t i, j, k, d, eidx, cnt;
+	cnt = 0;
+	uint32_t wushigang = cnt;
+	uint32_t tmp = wushigang;
+	wushigang = tmp;
 	int dir;
 	hash = init_uuhash(0x1fU);
 	ret = 0;
@@ -954,6 +958,10 @@ sg_edge_t* first_one_way_input_edge_strgraph(StringGraph *g, uint32_t node_id, i
  */
 int cut_tip1_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n1;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	//sg_node_t *n2;
 	sg_edge_t *e1;
 	n1 = ref_sgnodev(g->nodes, node_id);
@@ -991,6 +999,10 @@ int cut_tip4_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int di
  */
 int cut_tip2_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id){
 	sg_node_t *n1;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	//sg_node_t *n2, *n3;
 	sg_edge_t *e1, *e2;
 	//uint64_t flag;
@@ -1017,6 +1029,10 @@ int cut_tip2_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id){
  */
 int cut_tip5_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n1;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *e1, *e2;
 	n1 = ref_sgnodev(g->nodes, node_id);
 	e1 = first_living_edge_strgraph(g, node_id, dir);
@@ -1268,6 +1284,12 @@ uint64_t repair_all_lonely_one_way_edges_bog_strgraph(StringGraph *g){
 
 int merge_bubble1_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n1, *n2, *n3;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	n3 = NULL;
+	wushigang = n3;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *e1, *e2, *e3;
 	uint64_t flag;
 	n1 = ref_sgnodev(g->nodes, node_id);
@@ -1316,6 +1338,10 @@ int merge_bubble1_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, i
  */
 int merge_bubble2_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n0, *n1, *n2, *n3;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *es[4], *p;
 	uint64_t flag;
 	n1 = ref_sgnodev(g->nodes, node_id);
@@ -1363,6 +1389,12 @@ int merge_bubble2_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, i
 
 int merge_bubble3_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n, *n1, *n3;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	n3 = NULL;
+	wushigang = n3;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *e, *e0, *e1, *e2, *e3, *p;
 	uint32_t cnt1, cnt2, step, max_step;
 	max_step = MERGE_BUBBLE_MAX_STEP;
@@ -1502,6 +1534,12 @@ int merge_bubble4_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, i
 
 int cut_loop1_core_best_overlap_strgraph(StringGraph *g, uint32_t node_id, int dir){
 	sg_node_t *n, *n1, *n3;
+	n1 = NULL;
+	sg_node_t *wushigang = n1;
+	n3 = NULL;
+	wushigang = n3;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *e, *e0, *e1, *e2, *e3, *p;
 	uint32_t cnt1, cnt2, step, max_step;
 	max_step = 10;
@@ -1723,6 +1761,10 @@ uint64_t merge_bubbles_bog_strgraph(StringGraph *g){
 
 int cut_loop_core_bog_strgraph(StringGraph *g, uint32_t node_id, int dir, int max_step){
 	sg_node_t *n;
+	n = NULL;
+	sg_node_t *wushigang = n;
+	sg_node_t *tmp = wushigang;
+	wushigang = tmp;
 	sg_edge_t *e, *p;
 	uint32_t nid;
 	int step, k;
@@ -2852,6 +2894,11 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = f32list_obj_desc;
+	wsg = pbregv_obj_desc;
+	wsg = tracev_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	StringGraph *g;
 	FileReader *fr;
 	Sequence *seq;
@@ -2862,6 +2909,10 @@ int main(int argc, char **argv){
 	unsigned long long n;
 	int c, edgecov_cutoff, force_overwrite, dot_idx, min_score, margin, mat_score;
 	float len_var, score_var, best_score_cutoff, min_id, utg_sm;
+	len_var = 0;
+	float wushigang = len_var;
+	float tmp = wushigang;
+	wushigang = tmp;
 	pbs = init_cplist(4);
 	ovls = init_cplist(4);
 	obts = init_cplist(4);

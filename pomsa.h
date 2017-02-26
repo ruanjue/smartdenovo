@@ -343,6 +343,10 @@ static inline int update_pomsa(POMSA *g, uint8_t *seq, uint32_t len, float min_s
 	pocell_t *cs1, *cs2, *c1, *c2;
 	uint32_t qb, qe, tb, te, i, j, beg, end, base, mg_base;
 	uint32_t idx, max_idx, local_idx, y, z, pos, cur, nxt;
+	local_idx = 0;
+	uint32_t wushigang = local_idx;
+	uint32_t tmp = wushigang;
+	wushigang = tmp;
 	int max_score, max_local, ms, mi, mz, x;
 	int8_t *qps, *qp;
 	g->counter ++;
@@ -818,6 +822,7 @@ static inline void call_consensus_pomsa(POMSA *g){
 	pognode_t *n, *n2;
 	pogedge_t *e;
 	uint32_t i, idx, max_idx, cnt, pos, cov;
+	pos = 0;
 	int max_score, score, ncov;
 	stack = init_u4v(64);
 	for(i=0;i<g->nodes->size;i++){

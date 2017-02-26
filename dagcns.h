@@ -311,6 +311,10 @@ static inline void merge_nodes_core_dagcns(DAGCNS *g, uint32_t nid, u32list *sta
 	dagnode_t *n0, *n2, *n;
 	dagedge_t *e, *e2, *e1;
 	uint32_t base, eid, nid1, i, ret;
+	ret = 0;
+	uint32_t wushigang = ret;
+	uint32_t tmp = wushigang;
+	wushigang = tmp;
 	clear_u32list(stack);
 	push_u32list(stack, nid);
 	ret = 0;

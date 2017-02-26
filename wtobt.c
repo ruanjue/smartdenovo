@@ -267,7 +267,19 @@ void load_overlaps_wtobt(WTOBT *g, FileReader *fr){
 	wt_frg_t *n;
 	uint64_t off, ret;
 	uint32_t i, k, idx[2];
+	idx[0] = 0;
+	idx[1] = 0;
+	uint32_t wushigang0 = idx[0];
+	wushigang0 = idx[1];
+	uint32_t tmp0 = wushigang0;
+	wushigang0 = tmp0;
 	int len1, len2;
+	len1 = 0;
+	int wushigang = len1;
+	len2 = 0;
+	wushigang = len2;
+	int tmp = wushigang;
+	wushigang = tmp;
 	hit = &HIT;
 	ret = 0;
 	cigars = init_u32list(1024);
@@ -317,7 +329,7 @@ void load_overlaps_wtobt(WTOBT *g, FileReader *fr){
 	fprintf(stderr, "\r%llu overlaps\n", (unsigned long long)ret);
 }
 
-inline wt_ovl_t* edge_wtobt(WTOBT *g, uint32_t node_id, int dir, uint32_t eidx){
+wt_ovl_t* edge_wtobt(WTOBT *g, uint32_t node_id, int dir, uint32_t eidx){
 	wt_frg_t *n;
 	wt_ovl_t *e;
 	n = ref_wtfrgv(g->frgs, node_id);
@@ -461,7 +473,7 @@ for(node_id=tidx;node_id<wt->frgs->size;node_id+=ncpu){
 		n->clips[0] = b->pos;
 	}
 }
-if(tidx == 0) fprintf(stderr, "\rprogress: 100.00%%\n"); fflush(stderr);
+if(tidx == 0){ fprintf(stderr, "\rprogress: 100.00%%\n");} fflush(stderr);
 thread_end_loop(mobt);
 free_wtregv(regs);
 free_wtbrkv(brks);
@@ -612,6 +624,13 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = wtfrgv_obj_desc;
+	wsg = wthitv_obj_desc;
+	wsg = wtovlv_obj_desc;
+	wsg = wtregv_obj_desc;
+	wsg = wtbrkv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	WTOBT *g;
 	FileReader *fr;
 	Sequence *seq;
@@ -621,8 +640,13 @@ int main(int argc, char **argv){
 	uint64_t clips[2];
 	uint32_t node_id;
 	int c, ncpu, force_overwrite, sw_extend, min_cov, min_score, contained_trim;
+	sw_extend = 0;
+	int wushigang = sw_extend;
 	float min_sm;
 	thread_preprocess(mobt);
+	wushigang = mobt_j;
+	int tmp = wushigang;
+	wushigang = tmp;
 	pbs = init_cplist(4);
 	ovls = init_cplist(4);
 	obts = init_cplist(4);

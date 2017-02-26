@@ -1441,6 +1441,9 @@ static inline kswr_t kswx_extend_core(int qlen, uint8_t *query, int tlen, uint8_
 }
 
 static inline kswx_t kswx_gen_cigar_core2(int qlen, uint8_t *query, int tlen, uint8_t *target, kswr_t r, int m, const int8_t *matrix, int w, int I, int D, int E, int *_n_cigar, uint32_t **_cigar){
+	int wushigang = qlen;
+	int tmp = wushigang;
+	wushigang = tmp;
 	kswx_t x;
 	uint32_t *cigar;
 	int i, j, n_cigar, w2, x1, x2, op, len;

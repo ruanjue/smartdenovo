@@ -351,6 +351,10 @@ void load_overlaps_core_strgraph(StringGraph *g, sgbiedgev *biedges){
 	sg_edge_t *e1, *e2;
 	sg_node_t *n;
 	uint64_t ret, off, i;
+	ret = 0;
+	uint64_t wushigang = ret;
+	uint64_t tmp = wushigang;
+	wushigang = tmp;
 	uint32_t k, idx[2];
 	int len, len1, len2;
 	ret = 0;
@@ -463,7 +467,7 @@ sgbiedgev* load_overlaps_strgraph(StringGraph *g, FileReader *fr, u64hash *close
 	return biedges;
 }
 
-inline sg_edge_t* edge_strgraph(StringGraph *g, uint32_t node_id, int dir, uint32_t eidx){
+sg_edge_t* edge_strgraph(StringGraph *g, uint32_t node_id, int dir, uint32_t eidx){
 	sg_node_t *n;
 	sg_edge_t *e;
 	n = ref_sgnodev(g->nodes, node_id);
@@ -696,6 +700,10 @@ uint32_t mask_contained_reads_strgraph(StringGraph *g, FILE *log){
 	BitVec *flags;
 	uint32_t *map;
 	uint32_t i, j, k, c, len, ret;
+	len = 0;
+	uint32_t wushigang = len;
+	uint32_t tmp = wushigang;
+	wushigang = tmp;
 	int max_score;
 	ret = 0;
 	flags = init_bitvec(g->nodes->size);

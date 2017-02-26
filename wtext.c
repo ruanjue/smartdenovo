@@ -375,6 +375,9 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = wtovlv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	WTEXT *wt;
 	FileReader *fr;
 	Sequence *seq;

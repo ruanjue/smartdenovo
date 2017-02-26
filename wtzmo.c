@@ -282,7 +282,7 @@ if(midx->task == 1){
 			}
 		}
 	}
-	if(tidx == 0) fprintf(zmo_debug_out, "\r%u reads\n", end - beg); fflush(zmo_debug_out);
+	if(tidx == 0){ fprintf(zmo_debug_out, "\r%u reads\n", end - beg);} fflush(zmo_debug_out);
 } else if(midx->task == 2){
 	for(pbid=beg;pbid<end;pbid++){
 		if(tidx == 0 && ((pbid - beg) % 1000) == 0){ fprintf(zmo_debug_out, "\r%u", pbid - beg); fflush(zmo_debug_out); }
@@ -314,7 +314,7 @@ if(midx->task == 1){
 			u->cnt ++;
 		}
 	}
-	if(tidx == 0) fprintf(zmo_debug_out, "\r%u reads\n", pbid - beg); fflush(zmo_debug_out);
+	if(tidx == 0){ fprintf(zmo_debug_out, "\r%u reads\n", pbid - beg);} fflush(zmo_debug_out);
 }
 thread_end_loop(midx);
 thread_end_func(midx);
@@ -351,7 +351,11 @@ void index_wtzmo(WTZMO *wt, uint32_t beg, uint32_t end, uint32_t ncpu){
 	uint64_t nflt, nrem, none, ktot, off, totlen;
 	uint32_t ktyp, kavg, i;
 	thread_preprocess(midx);
+	int wushigang = midx_j;
 	thread_preprocess(msrt);
+	wushigang = msrt_j;
+	int tmp = wushigang;
+	wushigang = tmp;
 	totlen = 0;
 	if(wt->n_qr == 0 && wt->n_rd){
 		for(i=0;i<wt->n_rd;i++) totlen += wt->reads->buffer[i].rdlen;
@@ -748,6 +752,10 @@ u8list *mseq;
 kswr_t r;
 uint64_t val;
 uint32_t i, j, k, dir, id2, x1, x2, x3, x4, ol, pbid, *ptr, bcov, ncand, nbest;
+bcov = 0;
+uint32_t wushigang = bcov;
+uint32_t tmp = wushigang;
+wushigang = tmp;
 double avg;
 int alen, blen;
 wt = mzmo->wt;
@@ -1502,6 +1510,17 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	sr_seed_t wsg0 = SR_SEED_NULL;
+	sr_seed_t ttt0 = wsg0;
+	wsg0 = ttt0;
+	obj_desc_t wsg = hzminv_obj_desc;
+	wsg = hzrefv_obj_desc;
+	wsg = srseedv_obj_desc;
+	wsg = srseedhash_obj_desc;
+	wsg = wtovlv_obj_desc;
+	wsg = pbreadv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	WTZMO *wt;
 	cplist *pbs, *flts, *ovls, *obts, *tbas;
 	FileReader *fr;
@@ -1511,6 +1530,10 @@ int main(int argc, char **argv){
 	uint64_t val, pb1, pb2, naln;
 	uint32_t pbid;
 	int c, ncpu, min_rdlen, w, W, ew, M, X, O, E, T, hk, hz, ksize, zsize, kwin, kstep, ksave, ztot, zovl, kovl, kcut, zcut, kvar, min_score, ncand, nbest, overwrite, debug, n_job, i_job, n_idx, best_overlap;
+	best_overlap = 0;
+	int wushigang = best_overlap;
+	int tmp = wushigang;
+	wushigang = tmp;
 	float min_id, skip_contained, do_align, fast_align, wrep, wnorm, refine;
 	int dot_matrix, xvar, yvar, min_block_len, max_overhang;
 	float deviation_penalty, gap_penalty, optval;

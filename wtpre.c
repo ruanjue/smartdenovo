@@ -83,6 +83,9 @@ int main(int argc, char **argv){
 	out = outf? ((strcmp(outf, "-") == 0)? stdout : fopen(outf, "w")) : stdout;
 	int print;
 	print = 0;
+	int wushigang = print;
+	int tmp = wushigang;
+	wushigang = tmp;
 	while(fread_seq(&seq, fr)){
 		seqstr = seq->seq.string + clp_len;
 		seqlen = seq->seq.size - 2 * clp_len;

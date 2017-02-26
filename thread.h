@@ -74,7 +74,7 @@ struct tname##_struct {		\
 
 #define thread_beg_def(tname) thread_begin_def(tname)
 
-#define thread_begin_func(tname) inline void* thread_##tname##_func(void *obj){\
+#define thread_begin_func(tname) void* thread_##tname##_func(void *obj){\
 	volatile struct tname##_struct * tname = (volatile struct tname##_struct *)obj;\
 	int tname##_var_i, tname##_var_j;\
 	struct tname##_struct * tname##_params

@@ -786,6 +786,10 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = kswxv_obj_desc;
+	wsg = strpv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	FileReader *fr;
 	cplist *lays;
 	char *outf, *alnf;
@@ -793,6 +797,10 @@ int main(int argc, char **argv){
 	FILE *aln, *out;
 	long job;
 	int M, X, I, D, O, E, T, W, ew, rw, w, zsize, hz, zwin, zovl, zvar, n, ncpu, c, flag, n_job, i_job, work, refine, vmsa, fast_align[2], overwrite, min_cnt;
+	hz = 0;
+	int wushigang = hz;
+	int tmp = wushigang;
+	wushigang = tmp;
 	int use_qv;
 	float min_id, min_freq, ref_penalty, alt_penalty;
 	HZM_FAST_WINDOW_KMER_CHAINING = 0;

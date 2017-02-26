@@ -156,6 +156,10 @@ int gen_backbone_wtmsa(WTMSA *g){
 	kswx_t *p, *s;
 	uint32_t i;
 	uint8_t *t, *q;
+	t = NULL;
+	uint8_t *wushigang = t;
+	uint8_t *tmp = wushigang;
+	wushigang = tmp;
 	int tlen, qlen, tb, lstx, lsty;
 	clear_u1v(g->ref);
 	lstx = lsty = 0;
@@ -248,6 +252,10 @@ int mp_gen_backbone_wtmsa(WTMSA *g, int ncpu){
 	kswx_t *p, *s, *k;
 	uint32_t i, j;
 	uint8_t *t, *q;
+	t = NULL;
+	uint8_t *wushigang = t;
+	uint8_t *tmp = wushigang;
+	wushigang = tmp;
 	int tlen, qlen, tb;
 	thread_preprocess(mhzm);
 	thread_beg_init(mhzm, ncpu);
@@ -593,6 +601,10 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = kswxv_obj_desc;
+	wsg = strpv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	FileReader *fr;
 	cplist *lays;
 	char *outf, *print_ref, *print_dot;

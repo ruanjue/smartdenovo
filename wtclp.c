@@ -169,7 +169,7 @@ void load_alignments_wtclp(WTCLP *wt, float min_sm, FileReader *fr){
 	sort_array(wt->ptrs->buffer, wt->ptrs->size, uint64_t, wt->hits->buffer[a>>1].sids[a&0x1] > wt->hits->buffer[b>>1].sids[b&0x1]);
 	beg = 0; sids[0] = wt->hits->buffer[wt->ptrs->buffer[beg] >> 1].sids[wt->ptrs->buffer[beg] & 0x1];
 	for(i=beg=0;i<=wt->ptrs->size;i++){
-		if(i == wt->ptrs->size || (sids[1] = wt->hits->buffer[wt->ptrs->buffer[i] >> 1].sids[wt->ptrs->buffer[i] & 0x1]) != sids[0]){
+		if((sids[1] = wt->hits->buffer[wt->ptrs->buffer[i] >> 1].sids[wt->ptrs->buffer[i] & 0x1]) != sids[0] || i == wt->ptrs->size){
 			wt->seqs->buffer[sids[0]].alnoff = beg;
 			wt->seqs->buffer[sids[0]].alncnt = i - beg;
 			if(i - beg > 1){
@@ -944,12 +944,22 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = pbalnv_obj_desc;
+	wsg = pbseqv_obj_desc;
+	wsg = pbevtv_obj_desc;
+	wsg = spurv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	WTCLP *wt;
 	FileReader *fr;
 	cplist *ovls, *obts;
 	char *outf;
 	FILE *out;
 	int c, iter, max_iter, force, min_alen, min_dep, bin_size, fix_contained, whole;
+	min_dep = 0;
+	int wushigang = min_dep;
+	int tmp = wushigang;
+	wushigang = tmp;
 	int win_size, min_crs_dep, block_test, debug_x;
 	float min_sm;
 	uint64_t tol;

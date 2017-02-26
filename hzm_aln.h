@@ -579,6 +579,10 @@ static inline uint32_t potential_paired_kmers_windows(hzmpv *rs, int dir, uint32
 
 static inline uint32_t merge_paired_kmers_window(hzmpv *rs, int dir, wtseedv *seeds, hzmpv *anchors, u8list *mem[2], uint32_t zsize, uint32_t kwin, uint32_t kstep, uint32_t zovl){
 	hzmp_t *p, *p0, *p1, *p2, P;
+	p2 = NULL;
+	hzmp_t *wushigang = p2;
+	hzmp_t *tmp = wushigang;
+	wushigang = tmp;
 	wt_seed_t SEED;
 	uint32_t i, j, n, a, ol, ol2, lst, wlst, s, t, ret;
 	int nxt;

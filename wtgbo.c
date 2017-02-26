@@ -363,6 +363,9 @@ int usage(){
 }
 
 int main(int argc, char **argv){
+	obj_desc_t wsg = markv_obj_desc;
+	obj_desc_t ttt = wsg;
+	wsg = ttt;
 	StringGraph *g;
 	sgbiedgev *biedges;
 	u64hash *closed_alns;
@@ -376,6 +379,10 @@ int main(int argc, char **argv){
 	unsigned long long n, nn, i, val;
 	int c, edgecov_cutoff, overwrite, min_score, margin, mat_score, max_ext, max_iter, iter;
 	int ncpu, w, W, ew, M, X, O, E, T, hz, zsize, kwin, kstep, ztot, zovl, zcut, kvar, refine;
+	ztot = 0;
+	int wushigang = ztot;
+	int tmp = wushigang;
+	wushigang = tmp;
 	float best_score_cutoff, min_id;
 	pbs = init_cplist(4);
 	ovls = init_cplist(4);
