@@ -127,7 +127,7 @@ static inline BitVec* init_bitvec(uint64_t n_bit){
 	bitv = (BitVec*)malloc(sizeof(BitVec));
 	bitv->n_bit = 0;
 	bitv->n_cap = (((n_bit + 63) / 64) + 7) / 8 * 64 * 8;
-	bitv->bits  = (uint64_t*)calloc(bitv->n_cap / 64, 8);
+	bitv->bits  = (uint64_t*)calloc(bitv->n_cap / 64 + 1, 8);
 	//memset(bitv->bits, 0, bitv->n_cap / 8);
 	bitv->sums = NULL;
 	bitv->hash = NULL;
