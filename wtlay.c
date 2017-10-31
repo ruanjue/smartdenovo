@@ -1657,6 +1657,7 @@ int merge_bubble_core_best_overlap_strgraph(StringGraph *g, uuhash *hash, tracev
 	n1 = ref_sgnodev(g->nodes, node_id);
 	e1 = first_living_edge_strgraph(g, node_id, dir);
 	e2 = first_one_way_input_edge_strgraph(g, node_id, !dir);
+	if(e2 == NULL) return 0; // strange bubble, skip it, because I have no data to reproduce this. Please see https://github.com/ruanjue/smartdenovo/issues/10
 	e2 = edge_strgraph(g, e2->node_id, !e2->dir, e2->rev_idx);
 	clear_tracev(bts[0]);
 	clear_tracev(bts[1]);
