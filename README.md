@@ -7,7 +7,7 @@ awk 'NR%4==1||NR%4==2' selfSampleData/pacbio_filtered.fastq | sed 's/^@/>/g' > r
 # Install SMARTdenovo
 git clone https://github.com/ruanjue/smartdenovo.git && (cd smartdenovo; make)
 # Assemble (raw unitigs in wtasm.lay.utg; consensus unitigs: wtasm.cns)
-smartdenovo/smartdenovo.pl reads.fa > wtasm.mak
+smartdenovo/smartdenovo.pl -c 1 reads.fa > wtasm.mak
 make -f wtasm.mak
 ```
 
@@ -27,7 +27,7 @@ unitig consensus. The `smartdenovo.pl` script provides a convenient interface
 to call these programs in one go. If you do not care about the internal of
 SMARTdenovo, you may simply run with:
 ```sh
-/path/to/smartdenovo/smartdenovo.pl -p prefix reads.fa > prefix.mak
+/path/to/smartdenovo/smartdenovo.pl -p prefix -c 1 reads.fa > prefix.mak
 make -f prefix.mak
 ```
 It calls other SMARTdenovo executables in the same directory containing
